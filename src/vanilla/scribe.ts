@@ -1,6 +1,6 @@
 import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects } from '../core/types';
-import { processContent, buildListTree, getParagraphText, slugify } from '../core/utils';
-import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle } from '../core/parser';
+import { processContent, buildListTree, getParagraphText, slugify, parseInlineContent } from '../core/utils';
+import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
 
 export class GDocScribe {
     private doc: GoogleDoc;
@@ -59,31 +59,31 @@ export class GDocScribe {
 
         // Apply Indentation
         if (style?.indentStart) {
-            const indentStart = this.getDimensionStyle(style.indentStart);
+            const indentStart = getDimensionStyle(style.indentStart);
             if (indentStart) el.style.paddingLeft = indentStart;
         }
         if (style?.indentEnd) {
-            const indentEnd = this.getDimensionStyle(style.indentEnd);
+            const indentEnd = getDimensionStyle(style.indentEnd);
             if (indentEnd) el.style.paddingRight = indentEnd;
         }
         if (style?.indentFirstLine) {
-            const indentFirstLine = this.getDimensionStyle(style.indentFirstLine);
+            const indentFirstLine = getDimensionStyle(style.indentFirstLine);
             if (indentFirstLine) el.style.textIndent = indentFirstLine;
         }
 
         // Apply Spacing
         if (style?.spaceAbove) {
-            const spaceAbove = this.getDimensionStyle(style.spaceAbove);
+            const spaceAbove = getDimensionStyle(style.spaceAbove);
             if (spaceAbove) el.style.marginTop = spaceAbove;
         }
         if (style?.spaceBelow) {
-            const spaceBelow = this.getDimensionStyle(style.spaceBelow);
+            const spaceBelow = getDimensionStyle(style.spaceBelow);
             if (spaceBelow) el.style.marginBottom = spaceBelow;
         }
 
         // Apply Shading (Background Color)
         if (style?.shading?.backgroundColor?.color) {
-            const bgColor = this.getColorStyle(style.shading.backgroundColor.color);
+            const bgColor = getColorStyle(style.shading.backgroundColor.color);
             if (bgColor) {
                 el.style.backgroundColor = bgColor;
                 el.style.padding = '10px'; // Add default padding for shaded blocks
@@ -110,24 +110,6 @@ export class GDocScribe {
         }
 
         return el;
-    }
-
-    private getDimensionStyle(dimension: { magnitude?: number | null; unit?: string | null }): string | null {
-        if (dimension.magnitude && dimension.unit) {
-            return `${dimension.magnitude}${dimension.unit.toLowerCase()}`;
-        }
-        return null;
-    }
-
-    private getColorStyle(color: { rgbColor?: { red?: number | null; green?: number | null; blue?: number | null } }): string | null {
-        if (color.rgbColor) {
-            const { red, green, blue } = color.rgbColor;
-            const r = Math.round((red || 0) * 255);
-            const g = Math.round((green || 0) * 255);
-            const b = Math.round((blue || 0) * 255);
-            return `rgb(${r}, ${g}, ${b})`;
-        }
-        return null;
     }
 
     private renderTextRun(textRun: any): HTMLElement | Text | DocumentFragment {
@@ -170,23 +152,19 @@ export class GDocScribe {
             return root!;
         };
 
-        // Check for inline code (backticks)
-        const parts = content.split(/(`[^`]+`)/g);
+        // Use shared inline parsing logic
+        const parts = parseInlineContent(content);
 
-        if (parts.length === 1) {
-            return wrapWithTags(content);
+        if (parts.length === 1 && parts[0].type === 'text') {
+            return wrapWithTags(parts[0].content);
         }
 
         const fragment = document.createDocumentFragment();
 
-        parts.forEach((part: string) => {
-            if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-                const codeContent = part.slice(1, -1);
+        parts.forEach((part: any) => {
+            if (part.type === 'code') {
                 const codeEl = document.createElement('code');
-                codeEl.textContent = codeContent;
-                // Wrap code element with other styles if needed (e.g. bold/italic)
-                // But usually code blocks override other styles or sit inside them.
-                // Let's wrap the code element with the other tags to preserve styling like bold/italic on the code itself if applied
+                codeEl.textContent = part.content;
 
                 if (tags.length === 0) {
                     fragment.appendChild(codeEl);
@@ -219,9 +197,7 @@ export class GDocScribe {
                 }
 
             } else {
-                if (part) {
-                    fragment.appendChild(wrapWithTags(part));
-                }
+                fragment.appendChild(wrapWithTags(part.content));
             }
         });
 
@@ -303,13 +279,12 @@ export class GDocScribe {
     }
 
     private renderImage(objectId: string | null | undefined): HTMLElement | null {
-        if (!objectId || !this.inlineObjects) return null;
-        const embeddedObject = this.inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject;
-        if (!embeddedObject?.imageProperties?.contentUri) return null;
+        const imageData = getImageData(objectId, this.inlineObjects);
+        if (!imageData) return null;
 
         const img = document.createElement('img');
-        img.src = embeddedObject.imageProperties.contentUri;
-        img.alt = "Embedded Image";
+        img.src = imageData.src;
+        img.alt = imageData.alt;
 
         // Basic functional style for lightbox trigger
         img.style.cursor = 'pointer';
