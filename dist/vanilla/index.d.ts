@@ -1,0 +1,1 @@
+export { GDocScribe } from './scribe';

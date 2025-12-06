@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDoc-Scribe Studio</title>
+    <script src="./dist/gdoc-scribe.umd.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    typography: {
+                        DEFAULT: {
+                            css: {
+                                maxWidth: 'none',
+                            },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-editor: #0f172a;
+            --bg-preview: #f1f5f9;
+            --surface-paper: #ffffff;
+            --text-editor: #e2e8f0;
+            --text-body: #334155;
+            --border-editor: #1e293b;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-color: var(--bg-editor);
+            color: var(--text-body);
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Editor Pane (Left) */
+        .editor-pane {
+            width: 40%;
+            min-width: 350px;
+            background-color: var(--bg-editor);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-editor);
+            position: relative;
+            z-index: 10;
+        }
+
+        .editor-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-editor);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+        }
+
+        .brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+            letter-spacing: -0.025em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .brand span {
+            color: var(--primary);
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .editor-content {
+            flex: 1;
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            border: none;
+            color: var(--text-editor);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            padding: 1.5rem;
+            resize: none;
+            outline: none;
+        }
+
+        textarea::placeholder {
+            color: #475569;
+        }
+
+        /* Preview Pane (Right) */
+        .preview-pane {
+            flex: 1;
+            background-color: var(--bg-preview);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .preview-header {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: rgba(241, 245, 249, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+
+        .preview-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .paper {
+            background-color: var(--surface-paper);
+            width: 100%;
+            max-width: 816px;
+            /* A4 width approx */
+            min-height: 1056px;
+            /* A4 height approx */
+            padding: 4rem;
+            /* Standard doc margins */
+            box-shadow:
+                0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-radius: 2px;
+            margin-bottom: 4rem;
+            transition: transform 0.3s ease;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #fff;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 100;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast.success .toast-icon {
+            background-color: #d1fae5;
+            color: var(--success);
+        }
+
+        .toast.error .toast-icon {
+            background-color: #fee2e2;
+            color: var(--error);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .editor-pane ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                flex-direction: column;
+            }
+
+            .editor-pane {
+                width: 100%;
+                height: 40%;
+                border-right: none;
+                border-bottom: 1px solid var(--border-editor);
+            }
+
+            .paper {
+                padding: 2rem;
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Editor Pane -->
+        <div class="editor-pane">
+            <div class="editor-header">
+                <div class="brand">GDoc<span>Scribe</span></div>
+                <div class="editor-actions">
+                    <button id="renderBtn" class="btn btn-primary">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Render
+                    </button>
+                </div>
+            </div>
+            <div class="editor-content">
+                <textarea id="jsonInput" spellcheck="false" class="text-white p-4"
+                    placeholder="// Paste your Google Doc JSON here..."></textarea>
+            </div>
+        </div>
+
+        <!-- Preview Pane -->
+        <div class="preview-pane">
+            <div class="preview-header">
+                <span>Document Preview</span>
+                <span id="wordCount">0 words</span>
+            </div>
+            <div class="preview-scroll-area">
+                <div class="paper">
+                    <div id="app" class="prose prose-slate max-w-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast">
+        <div class="toast-icon">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd" />
+            </svg>
+        </div>
+        <span id="toastMsg">Rendered successfully</span>
+    </div>
+
+    <script>
+        const renderBtn = document.getElementById('renderBtn');
+        const jsonInput = document.getElementById('jsonInput');
+        const app = document.getElementById('app');
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toastMsg');
+        const wordCount = document.getElementById('wordCount');
+
+        // Show Toast Function
+        function showToast(message, type = 'success') {
+            toastMsg.textContent = message;
+            toast.className = `toast ${type} show`;
+
+            // Icon update
+            const icon = toast.querySelector('.toast-icon');
+            if (type === 'success') {
+                icon.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+            } else {
+                icon.innerHTML = '<svg width="12" height="12" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
+            }
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Update Word Count
+        function updateStats() {
+            const text = app.innerText || "";
+            const count = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+            wordCount.textContent = `${count} words`;
+        }
+
+        // Default Mock Data
+        const mockDoc = {
+            "title": "Expanded Demo Document",
+            "body": {
+                "content": [
+                    {
+                        "endIndex": 1,
+                        "sectionBreak": {
+                            "sectionStyle": {
+                                "columnSeparatorStyle": "NONE",
+                                "contentDirection": "LEFT_TO_RIGHT",
+                                "sectionType": "CONTINUOUS"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 1,
+                        "endIndex": 23,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 1,
+                                    "endIndex": 23,
+                                    "textRun": {
+                                        "content": "Title of the Document\n",
+                                        "textStyle": { "fontSize": { "magnitude": 26, "unit": "PT" }, "bold": true }
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "TITLE",
+                                "direction": "LEFT_TO_RIGHT",
+                                "alignment": "CENTER"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 23,
+                        "endIndex": 36,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 23,
+                                    "endIndex": 36,
+                                    "textRun": {
+                                        "content": "Introduction\n",
+                                        "textStyle": { "fontSize": { "magnitude": 18, "unit": "PT" }, "bold": true }
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "HEADING_1",
+                                "direction": "LEFT_TO_RIGHT"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 36,
+                        "endIndex": 114,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 36,
+                                    "endIndex": 80,
+                                    "textRun": {
+                                        "content": "This is a longer paragraph to show more text. ",
+                                        "textStyle": {}
+                                    }
+                                },
+                                {
+                                    "startIndex": 80,
+                                    "endIndex": 96,
+                                    "textRun": {
+                                        "content": "It has bold text",
+                                        "textStyle": { "bold": true }
+                                    }
+                                },
+                                {
+                                    "startIndex": 96,
+                                    "endIndex": 101,
+                                    "textRun": {
+                                        "content": " and ",
+                                        "textStyle": {}
+                                    }
+                                },
+                                {
+                                    "startIndex": 101,
+                                    "endIndex": 112,
+                                    "textRun": {
+                                        "content": "italic text",
+                                        "textStyle": { "italic": true }
+                                    }
+                                },
+                                {
+                                    "startIndex": 112,
+                                    "endIndex": 114,
+                                    "textRun": {
+                                        "content": ".\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 114,
+                        "endIndex": 129,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 114,
+                                    "endIndex": 129,
+                                    "textRun": {
+                                        "content": "Features List:\n",
+                                        "textStyle": { "fontSize": { "magnitude": 14, "unit": "PT" }, "bold": true }
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "HEADING_2",
+                                "direction": "LEFT_TO_RIGHT"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 129,
+                        "endIndex": 138,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 129,
+                                    "endIndex": 138,
+                                    "textRun": {
+                                        "content": "Item One\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT"
+                            },
+                            "bullet": {
+                                "listId": "kix.list1",
+                                "textStyle": { "underline": false }
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 138,
+                        "endIndex": 147,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 138,
+                                    "endIndex": 147,
+                                    "textRun": {
+                                        "content": "Item Two\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT"
+                            },
+                            "bullet": {
+                                "listId": "kix.list1",
+                                "textStyle": { "underline": false }
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 147,
+                        "endIndex": 158,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 147,
+                                    "endIndex": 158,
+                                    "textRun": {
+                                        "content": "Sub Item A\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT",
+                                "indentFirstLine": { "magnitude": 18, "unit": "PT" },
+                                "indentStart": { "magnitude": 36, "unit": "PT" }
+                            },
+                            "bullet": {
+                                "listId": "kix.list1",
+                                "nestingLevel": 1,
+                                "textStyle": { "underline": false }
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 158,
+                        "endIndex": 169,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 158,
+                                    "endIndex": 169,
+                                    "textRun": {
+                                        "content": "Sub Item B\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT",
+                                "indentFirstLine": { "magnitude": 18, "unit": "PT" },
+                                "indentStart": { "magnitude": 36, "unit": "PT" }
+                            },
+                            "bullet": {
+                                "listId": "kix.list1",
+                                "nestingLevel": 1,
+                                "textStyle": { "underline": false }
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 169,
+                        "endIndex": 180,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 169,
+                                    "endIndex": 180,
+                                    "textRun": {
+                                        "content": "Item Three\n",
+                                        "textStyle": {}
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT"
+                            },
+                            "bullet": {
+                                "listId": "kix.list1",
+                                "textStyle": { "underline": false }
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 180,
+                        "endIndex": 191,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 180,
+                                    "endIndex": 191,
+                                    "textRun": {
+                                        "content": "Conclusion\n",
+                                        "textStyle": { "fontSize": { "magnitude": 18, "unit": "PT" }, "bold": true }
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "HEADING_1",
+                                "direction": "LEFT_TO_RIGHT"
+                            }
+                        }
+                    },
+                    {
+                        "startIndex": 191,
+                        "endIndex": 204,
+                        "paragraph": {
+                            "elements": [
+                                {
+                                    "startIndex": 191,
+                                    "endIndex": 204,
+                                    "textRun": {
+                                        "content": "End of demo.\n",
+                                        "textStyle": { "italic": true }
+                                    }
+                                }
+                            ],
+                            "paragraphStyle": {
+                                "namedStyleType": "NORMAL_TEXT",
+                                "direction": "LEFT_TO_RIGHT"
+                            }
+                        }
+                    }
+                ]
+            },
+            "lists": {
+                "kix.list1": {
+                    "listProperties": {
+                        "nestingLevels": [
+                            {
+                                "bulletAlignment": "START",
+                                "glyphSymbol": "●",
+                                "glyphFormat": "%0",
+                                "indentFirstLine": { "magnitude": 18, "unit": "PT" },
+                                "indentStart": { "magnitude": 36, "unit": "PT" },
+                                "textStyle": { "underline": false },
+                                "startNumber": 1
+                            },
+                            {
+                                "bulletAlignment": "START",
+                                "glyphSymbol": "○",
+                                "glyphFormat": "%1",
+                                "indentFirstLine": { "magnitude": 54, "unit": "PT" },
+                                "indentStart": { "magnitude": 72, "unit": "PT" },
+                                "textStyle": { "underline": false },
+                                "startNumber": 1
+                            }
+                        ]
+                    }
+                }
+            },
+            "revisionId": "mock_revision_id_v2",
+            "suggestionsViewMode": "SUGGESTIONS_INLINE",
+            "documentId": "mock_doc_id_v2"
+        };
+
+        // Set default value
+        jsonInput.value = JSON.stringify(mockDoc, null, 2);
+
+        function renderDoc(docData) {
+            app.innerHTML = ''; // Clear previous render
+            try {
+                console.log('Initializing GDocScribe...');
+                const scribe = new GDocScribe.GDocScribe(docData);
+                scribe.render(app);
+                console.log('Render complete.');
+                showToast('Document rendered successfully', 'success');
+                updateStats();
+            } catch (e) {
+                console.error(e);
+                app.innerHTML = `<div style="color: #ef4444; padding: 1rem; background: #fee2e2; border-radius: 4px; border: 1px solid #fca5a5;">
+                    <strong>Error rendering document:</strong><br>${e.message}
+                </div>`;
+                showToast('Failed to render document', 'error');
+            }
+        }
+
+        renderBtn.addEventListener('click', () => {
+            try {
+                const json = JSON.parse(jsonInput.value);
+                renderDoc(json);
+            } catch (e) {
+                showToast('Invalid JSON format', 'error');
+            }
+        });
+
+        // Initial render
+        renderDoc(mockDoc);
+    </script>
+</body>
+
+</html>
