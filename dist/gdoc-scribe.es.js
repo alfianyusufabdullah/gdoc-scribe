@@ -1,57 +1,95 @@
-var D = Object.defineProperty;
-var w = (n, t, e) => t in n ? D(n, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : n[t] = e;
-var d = (n, t, e) => w(n, typeof t != "symbol" ? t + "" : t, e);
-import c, { useMemo as S } from "react";
-const y = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, ""), E = (n) => n.map((t) => {
+var j = Object.defineProperty;
+var O = (r, t, e) => t in r ? j(r, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : r[t] = e;
+var E = (r, t, e) => O(r, typeof t != "symbol" ? t + "" : t, e);
+import u, { useMemo as T } from "react";
+const C = (r) => r.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, ""), y = (r) => r.map((t) => {
   var e;
   return ((e = t.textRun) == null ? void 0 : e.content) || "";
-}).join("").replace(/\u000b/g, "").trim(), f = (n) => {
+}).join("").replace(/\u000b/g, "").trim(), b = (r) => {
+  var l, a;
   const t = [];
-  let e = null;
-  return n ? (n.forEach((r) => {
-    var s, a;
-    if (r.paragraph && r.paragraph.bullet) {
-      const l = r.paragraph.bullet.listId;
-      e ? ((a = (s = e.items[0].paragraph) == null ? void 0 : s.bullet) == null ? void 0 : a.listId) !== l && (e = { type: "list_group", items: [] }, t.push(e)) : (e = { type: "list_group", items: [] }, t.push(e)), e.items.push(r);
+  let e = null, n = null;
+  if (!r) return [];
+  for (let i = 0; i < r.length; i++) {
+    const o = r[i], s = o.paragraph ? y(o.paragraph.elements || []) : "";
+    if (!n && s.trim().startsWith("```")) {
+      const c = s.trim(), p = c.match(/^```(\w*)\s*([\s\S]*?)\s*```$/);
+      if (p && c.length > 3) {
+        t.push({
+          type: "code_block",
+          language: p[1] || "",
+          content: p[2]
+        });
+        continue;
+      }
+      n = {
+        type: "code_block",
+        language: s.trim().replace(/^```/, "").trim(),
+        content: []
+      };
+      continue;
+    }
+    if (n && s.trim() === "```") {
+      t.push({
+        type: "code_block",
+        language: n.language,
+        content: n.content.join(`
+`)
+      }), n = null;
+      continue;
+    }
+    if (n) {
+      n.content.push(s);
+      continue;
+    }
+    if (o.paragraph && o.paragraph.bullet) {
+      const c = o.paragraph.bullet.listId;
+      e ? ((a = (l = e.items[0].paragraph) == null ? void 0 : l.bullet) == null ? void 0 : a.listId) !== c && (e = { type: "list_group", items: [] }, t.push(e)) : (e = { type: "list_group", items: [] }, t.push(e)), e.items.push(o);
     } else
-      e = null, t.push(r);
-  }), t) : [];
-}, x = (n) => {
+      e = null, t.push(o);
+  }
+  return n && t.push({
+    type: "code_block",
+    language: n.language,
+    content: n.content.join(`
+`)
+  }), t;
+}, x = (r) => {
   const t = [], e = [];
-  return n.forEach((r) => {
-    var l, i;
-    const s = ((i = (l = r.paragraph) == null ? void 0 : l.bullet) == null ? void 0 : i.nestingLevel) || 0, a = { item: r, children: [], level: s };
-    for (; e.length > 0 && e[e.length - 1].level >= s; )
+  return r.forEach((n) => {
+    var i, o;
+    const l = ((o = (i = n.paragraph) == null ? void 0 : i.bullet) == null ? void 0 : o.nestingLevel) || 0, a = { item: n, children: [], level: l };
+    for (; e.length > 0 && e[e.length - 1].level >= l; )
       e.pop();
     e.length === 0 ? t.push(a) : e[e.length - 1].children.push(a), e.push(a);
   }), t;
-}, P = (n) => {
+}, _ = (r) => {
   const t = [];
-  return n.forEach((e) => {
-    var r, s;
-    if (e.paragraph && ((s = (r = e.paragraph.paragraphStyle) == null ? void 0 : r.namedStyleType) != null && s.startsWith("HEADING"))) {
-      const a = e.paragraph.paragraphStyle.namedStyleType, l = parseInt(a.split("_")[1]), i = E(e.paragraph.elements || []);
-      i && !isNaN(l) && t.push({
-        id: y(i),
-        text: i,
-        level: l
+  return r.forEach((e) => {
+    var n, l;
+    if (e.paragraph && ((l = (n = e.paragraph.paragraphStyle) == null ? void 0 : n.namedStyleType) != null && l.startsWith("HEADING"))) {
+      const a = e.paragraph.paragraphStyle.namedStyleType, i = parseInt(a.split("_")[1]), o = y(e.paragraph.elements || []);
+      o && !isNaN(i) && t.push({
+        id: C(o),
+        text: o,
+        level: i
       });
     }
   }), t;
-}, I = (n) => {
+}, I = (r) => {
   var e;
-  if (!n) return [];
+  if (!r) return [];
   const t = [];
-  return n.bold && t.push({ tag: "strong" }), n.italic && t.push({ tag: "em" }), n.underline && t.push({ tag: "u" }), n.strikethrough && t.push({ tag: "s" }), (e = n.link) != null && e.url && t.push({
+  return r.bold && t.push({ tag: "strong" }), r.italic && t.push({ tag: "em" }), r.underline && t.push({ tag: "u" }), r.strikethrough && t.push({ tag: "s" }), (e = r.link) != null && e.url && t.push({
     tag: "a",
     attrs: {
-      href: n.link.url,
+      href: r.link.url,
       target: "_blank",
       rel: "noopener noreferrer"
     }
   }), t;
-}, R = (n) => {
-  const t = n == null ? void 0 : n.namedStyleType;
+}, L = (r) => {
+  const t = r == null ? void 0 : r.namedStyleType;
   if (t === "TITLE") return "h1";
   if (t === "SUBTITLE") return "p";
   if (t != null && t.startsWith("HEADING_")) {
@@ -60,19 +98,19 @@ const y = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g
       return `h${e}`;
   }
   return "p";
-}, L = (n, t, e) => {
-  var o, p;
-  if (!n || !e) return { tag: "ul", styleType: "disc" };
-  const r = e[n];
-  if (!r) return { tag: "ul", styleType: "disc" };
-  const s = t || 0, a = (p = (o = r.listProperties) == null ? void 0 : o.nestingLevels) == null ? void 0 : p[s];
-  let l = a == null ? void 0 : a.glyphType;
-  if (!l || l === "GLYPH_TYPE_UNSPECIFIED")
+}, R = (r, t, e) => {
+  var c, p;
+  if (!r || !e) return { tag: "ul", styleType: "disc" };
+  const n = e[r];
+  if (!n) return { tag: "ul", styleType: "disc" };
+  const l = t || 0, a = (p = (c = n.listProperties) == null ? void 0 : c.nestingLevels) == null ? void 0 : p[l];
+  let i = a == null ? void 0 : a.glyphType;
+  if (!i || i === "GLYPH_TYPE_UNSPECIFIED")
     if (a != null && a.glyphSymbol) {
       const g = a.glyphSymbol;
-      g === "●" ? l = "DISC" : g === "○" ? l = "CIRCLE" : g === "■" ? l = "SQUARE" : l = "DISC";
-    } else a != null && a.glyphFormat && a.glyphFormat.includes("%") ? l = "DECIMAL" : l = "DISC";
-  const u = {
+      g === "●" ? i = "DISC" : g === "○" ? i = "CIRCLE" : g === "■" ? i = "SQUARE" : i = "DISC";
+    } else a != null && a.glyphFormat && a.glyphFormat.includes("%") ? i = "DECIMAL" : i = "DISC";
+  const s = {
     DECIMAL: { tag: "ol", style: "decimal" },
     DECIMAL_ZERO: { tag: "ol", style: "decimal-leading-zero" },
     UPPER_ALPHA: { tag: "ol", style: "upper-alpha" },
@@ -83,13 +121,13 @@ const y = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g
     CIRCLE: { tag: "ul", style: "circle" },
     SQUARE: { tag: "ul", style: "square" },
     NONE: { tag: "ul", style: "none" }
-  }[l] || { tag: "ul", style: "disc" };
+  }[i] || { tag: "ul", style: "disc" };
   return {
-    tag: u.tag,
-    styleType: u.style
+    tag: s.tag,
+    styleType: s.style
   };
-}, v = (n) => {
-  switch (n) {
+}, k = (r) => {
+  switch (r) {
     case "CENTER":
       return "center";
     case "END":
@@ -100,181 +138,242 @@ const y = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g
       return;
   }
 };
-class W {
+class $ {
   constructor(t) {
-    d(this, "doc");
-    d(this, "inlineObjects");
+    E(this, "doc");
+    E(this, "inlineObjects");
     this.doc = t, this.inlineObjects = t.inlineObjects || null;
   }
   render(t) {
-    var r;
-    if (t.innerHTML = "", !((r = this.doc.body) != null && r.content)) return;
-    f(this.doc.body.content).forEach((s) => {
-      if ("type" in s && s.type === "list_group")
-        t.appendChild(this.renderListGroup(s.items));
+    var n;
+    if (t.innerHTML = "", !((n = this.doc.body) != null && n.content)) return;
+    b(this.doc.body.content).forEach((l) => {
+      if ("type" in l && l.type === "list_group")
+        t.appendChild(this.renderListGroup(l.items));
+      else if ("type" in l && l.type === "code_block")
+        t.appendChild(this.renderCodeBlock(l));
       else {
-        const a = s;
+        const a = l;
         a.paragraph ? t.appendChild(this.renderParagraph(a.paragraph)) : a.table && t.appendChild(this.renderTable(a.table));
       }
     });
   }
+  renderCodeBlock(t) {
+    const e = document.createElement("pre"), n = document.createElement("code");
+    return t.language && (n.className = `language-${t.language}`), n.textContent = t.content, e.appendChild(n), e;
+  }
   renderParagraph(t) {
-    const e = t.paragraphStyle, r = R(e), s = document.createElement(r), a = v((e == null ? void 0 : e.alignment) || void 0);
-    if (a && (s.style.textAlign = a), r.startsWith("h")) {
-      const l = E(t.elements || []);
-      l && (s.id = y(l));
+    var i, o;
+    const e = t.paragraphStyle, n = L(e), l = document.createElement(n), a = k((e == null ? void 0 : e.alignment) || void 0);
+    if (a && (l.style.textAlign = a), e != null && e.indentStart) {
+      const s = this.getDimensionStyle(e.indentStart);
+      s && (l.style.paddingLeft = s);
     }
-    return t.elements && t.elements.forEach((l) => {
-      if (l.textRun) {
-        const i = this.renderTextRun(l.textRun);
-        s.appendChild(i);
-      } else if (l.inlineObjectElement) {
-        const i = this.renderImage(l.inlineObjectElement.inlineObjectId);
-        i && s.appendChild(i);
+    if (e != null && e.indentEnd) {
+      const s = this.getDimensionStyle(e.indentEnd);
+      s && (l.style.paddingRight = s);
+    }
+    if (e != null && e.indentFirstLine) {
+      const s = this.getDimensionStyle(e.indentFirstLine);
+      s && (l.style.textIndent = s);
+    }
+    if (e != null && e.spaceAbove) {
+      const s = this.getDimensionStyle(e.spaceAbove);
+      s && (l.style.marginTop = s);
+    }
+    if (e != null && e.spaceBelow) {
+      const s = this.getDimensionStyle(e.spaceBelow);
+      s && (l.style.marginBottom = s);
+    }
+    if ((o = (i = e == null ? void 0 : e.shading) == null ? void 0 : i.backgroundColor) != null && o.color) {
+      const s = this.getColorStyle(e.shading.backgroundColor.color);
+      s && (l.style.backgroundColor = s, l.style.padding = "10px", l.style.borderRadius = "4px");
+    }
+    if (n.startsWith("h")) {
+      const s = y(t.elements || []);
+      s && (l.id = C(s));
+    }
+    return t.elements && t.elements.forEach((s) => {
+      if (s.textRun) {
+        const c = this.renderTextRun(s.textRun);
+        l.appendChild(c);
+      } else if (s.inlineObjectElement) {
+        const c = this.renderImage(s.inlineObjectElement.inlineObjectId);
+        c && l.appendChild(c);
       }
-    }), s;
+    }), l;
+  }
+  getDimensionStyle(t) {
+    return t.magnitude && t.unit ? `${t.magnitude}${t.unit.toLowerCase()}` : null;
+  }
+  getColorStyle(t) {
+    if (t.rgbColor) {
+      const { red: e, green: n, blue: l } = t.rgbColor, a = Math.round((e || 0) * 255), i = Math.round((n || 0) * 255), o = Math.round((l || 0) * 255);
+      return `rgb(${a}, ${i}, ${o})`;
+    }
+    return null;
   }
   renderTextRun(t) {
     let e = t.content || "";
     if (!e) return document.createTextNode("");
     e = e.replace(/\u000b/g, "");
-    const r = I(t.textStyle);
-    if (r.length === 0)
-      return document.createTextNode(e);
-    let s = null, a = null;
-    for (const l of r) {
-      const i = document.createElement(l.tag);
-      l.attrs && Object.entries(l.attrs).forEach(([u, o]) => i.setAttribute(u, o)), s ? (a.appendChild(i), a = i) : (s = i, a = i);
-    }
-    return a && (a.textContent = e), s;
+    const n = I(t.textStyle), l = (o) => {
+      if (n.length === 0)
+        return document.createTextNode(o);
+      let s = null, c = null;
+      for (const p of n) {
+        const g = document.createElement(p.tag);
+        p.attrs && Object.entries(p.attrs).forEach(([d, h]) => g.setAttribute(d, h)), s ? (c.appendChild(g), c = g) : (s = g, c = g);
+      }
+      return c && (c.textContent = o), s;
+    }, a = e.split(/(`[^`]+`)/g);
+    if (a.length === 1)
+      return l(e);
+    const i = document.createDocumentFragment();
+    return a.forEach((o) => {
+      if (o.startsWith("`") && o.endsWith("`") && o.length > 2) {
+        const s = o.slice(1, -1), c = document.createElement("code");
+        if (c.textContent = s, n.length === 0)
+          i.appendChild(c);
+        else {
+          let p = null, g = null;
+          for (const d of n) {
+            const h = document.createElement(d.tag);
+            d.attrs && Object.entries(d.attrs).forEach(([m, f]) => h.setAttribute(m, f)), p ? (g.appendChild(h), g = h) : (p = h, g = h);
+          }
+          g ? (g.appendChild(c), i.appendChild(p)) : i.appendChild(c);
+        }
+      } else
+        o && i.appendChild(l(o));
+    }), i;
   }
   renderListGroup(t) {
     const e = x(t);
     return this.renderListTree(e);
   }
   renderListTree(t) {
-    var u, o;
+    var s, c;
     if (t.length === 0) return document.createElement("ul");
-    const e = t[0], r = (o = (u = e.item.paragraph) == null ? void 0 : u.bullet) == null ? void 0 : o.listId, s = e.level, { tag: a, styleType: l } = L(r, s, this.doc.lists), i = document.createElement(a);
-    return i.style.listStyleType = l, t.forEach((p) => {
-      var h;
+    const e = t[0], n = (c = (s = e.item.paragraph) == null ? void 0 : s.bullet) == null ? void 0 : c.listId, l = e.level, { tag: a, styleType: i } = R(n, l, this.doc.lists), o = document.createElement(a);
+    return o.style.listStyleType = i, t.forEach((p) => {
+      var d;
       const g = document.createElement("li");
-      (h = p.item.paragraph) != null && h.elements && p.item.paragraph.elements.forEach((m) => {
-        m.textRun && g.appendChild(this.renderTextRun(m.textRun));
-      }), p.children.length > 0 && g.appendChild(this.renderListTree(p.children)), i.appendChild(g);
-    }), i;
+      (d = p.item.paragraph) != null && d.elements && p.item.paragraph.elements.forEach((h) => {
+        h.textRun && g.appendChild(this.renderTextRun(h.textRun));
+      }), p.children.length > 0 && g.appendChild(this.renderListTree(p.children)), o.appendChild(g);
+    }), o;
   }
   renderTable(t) {
-    const e = document.createElement("table"), r = document.createElement("tbody");
-    return e.appendChild(r), (t.tableRows || []).forEach((s) => {
+    const e = document.createElement("table"), n = document.createElement("tbody");
+    return e.appendChild(n), (t.tableRows || []).forEach((l) => {
       const a = document.createElement("tr");
-      (s.tableCells || []).forEach((l) => {
-        var u, o;
-        const i = document.createElement("td");
-        (u = l.tableCellStyle) != null && u.columnSpan && (i.colSpan = l.tableCellStyle.columnSpan), (o = l.tableCellStyle) != null && o.rowSpan && (i.rowSpan = l.tableCellStyle.rowSpan), l.content && f(l.content).forEach((g) => {
+      (l.tableCells || []).forEach((i) => {
+        var s, c;
+        const o = document.createElement("td");
+        (s = i.tableCellStyle) != null && s.columnSpan && (o.colSpan = i.tableCellStyle.columnSpan), (c = i.tableCellStyle) != null && c.rowSpan && (o.rowSpan = i.tableCellStyle.rowSpan), i.content && b(i.content).forEach((g) => {
           if ("type" in g && g.type === "list_group")
-            i.appendChild(this.renderListGroup(g.items));
+            o.appendChild(this.renderListGroup(g.items));
           else {
-            const h = g;
-            h.paragraph && i.appendChild(this.renderParagraph(h.paragraph));
+            const d = g;
+            d.paragraph && o.appendChild(this.renderParagraph(d.paragraph));
           }
-        }), a.appendChild(i);
-      }), r.appendChild(a);
+        }), a.appendChild(o);
+      }), n.appendChild(a);
     }), e;
   }
   renderImage(t) {
-    var s, a, l;
+    var l, a, i;
     if (!t || !this.inlineObjects) return null;
-    const e = (a = (s = this.inlineObjects[t]) == null ? void 0 : s.inlineObjectProperties) == null ? void 0 : a.embeddedObject;
-    if (!((l = e == null ? void 0 : e.imageProperties) != null && l.contentUri)) return null;
-    const r = document.createElement("img");
-    return r.src = e.imageProperties.contentUri, r.alt = "Embedded Image", r.style.cursor = "pointer", r.onclick = () => this.openLightbox(r.src), r;
+    const e = (a = (l = this.inlineObjects[t]) == null ? void 0 : l.inlineObjectProperties) == null ? void 0 : a.embeddedObject;
+    if (!((i = e == null ? void 0 : e.imageProperties) != null && i.contentUri)) return null;
+    const n = document.createElement("img");
+    return n.src = e.imageProperties.contentUri, n.alt = "Embedded Image", n.style.cursor = "pointer", n.onclick = () => this.openLightbox(n.src), n;
   }
   openLightbox(t) {
     const e = document.createElement("div");
     e.style.position = "fixed", e.style.top = "0", e.style.left = "0", e.style.width = "100%", e.style.height = "100%", e.style.backgroundColor = "rgba(0,0,0,0.8)", e.style.display = "flex", e.style.alignItems = "center", e.style.justifyContent = "center", e.style.zIndex = "9999", e.style.cursor = "pointer";
-    const r = document.createElement("img");
-    r.src = t, r.style.maxWidth = "90%", r.style.maxHeight = "90%", r.style.objectFit = "contain", e.appendChild(r), e.onclick = () => document.body.removeChild(e), document.body.appendChild(e);
+    const n = document.createElement("img");
+    n.src = t, n.style.maxWidth = "90%", n.style.maxHeight = "90%", n.style.objectFit = "contain", e.appendChild(n), e.onclick = () => document.body.removeChild(e), document.body.appendChild(e);
   }
 }
-const N = (n) => {
-  const t = S(() => {
-    var r;
-    return (r = n == null ? void 0 : n.body) != null && r.content ? P(n.body.content) : [];
-  }, [n]);
-  return { html: S(() => {
-    var r;
-    return (r = n == null ? void 0 : n.body) != null && r.content ? k(n.body.content, n.inlineObjects, n.lists) : null;
-  }, [n]), toc: t };
+const D = (r) => {
+  const t = T(() => {
+    var n;
+    return (n = r == null ? void 0 : r.body) != null && n.content ? _(r.body.content) : [];
+  }, [r]);
+  return { html: T(() => {
+    var n;
+    return (n = r == null ? void 0 : r.body) != null && n.content ? v(r.body.content, r.inlineObjects, r.lists) : null;
+  }, [r]), toc: t };
 };
-function k(n, t, e) {
-  return f(n).map((s, a) => {
-    if ("type" in s && s.type === "list_group")
-      return /* @__PURE__ */ c.createElement(G, { key: a, items: s.items, inlineObjects: t, lists: e });
-    const l = s;
-    return l.paragraph ? /* @__PURE__ */ c.createElement(_, { key: a, paragraph: l.paragraph, inlineObjects: t }) : l.table ? /* @__PURE__ */ c.createElement(U, { key: a, table: l.table, inlineObjects: t, lists: e }) : null;
+function v(r, t, e) {
+  return b(r).map((l, a) => {
+    if ("type" in l && l.type === "list_group")
+      return /* @__PURE__ */ u.createElement(F, { key: a, items: l.items, inlineObjects: t, lists: e });
+    const i = l;
+    return i.paragraph ? /* @__PURE__ */ u.createElement(P, { key: a, paragraph: i.paragraph, inlineObjects: t }) : i.table ? /* @__PURE__ */ u.createElement(M, { key: a, table: i.table, inlineObjects: t, lists: e }) : null;
   });
 }
-function _({ paragraph: n, inlineObjects: t }) {
-  var u;
-  const e = n.paragraphStyle, r = R(e), s = r, a = v((e == null ? void 0 : e.alignment) || void 0), l = a ? { textAlign: a } : void 0;
-  let i;
-  if (r.startsWith("h")) {
-    const o = E(n.elements || []);
-    o && (i = y(o));
+function P({ paragraph: r, inlineObjects: t }) {
+  var s;
+  const e = r.paragraphStyle, n = L(e), l = n, a = k((e == null ? void 0 : e.alignment) || void 0), i = a ? { textAlign: a } : void 0;
+  let o;
+  if (n.startsWith("h")) {
+    const c = y(r.elements || []);
+    c && (o = C(c));
   }
-  return /* @__PURE__ */ c.createElement(s, { id: i, style: l }, (u = n.elements) == null ? void 0 : u.map((o, p) => /* @__PURE__ */ c.createElement(c.Fragment, { key: p }, o.textRun && /* @__PURE__ */ c.createElement(A, { textRun: o.textRun }), o.inlineObjectElement && /* @__PURE__ */ c.createElement(F, { objectId: o.inlineObjectElement.inlineObjectId, inlineObjects: t }))));
+  return /* @__PURE__ */ u.createElement(l, { id: o, style: i }, (s = r.elements) == null ? void 0 : s.map((c, p) => /* @__PURE__ */ u.createElement(u.Fragment, { key: p }, c.textRun && /* @__PURE__ */ u.createElement(w, { textRun: c.textRun }), c.inlineObjectElement && /* @__PURE__ */ u.createElement(G, { objectId: c.inlineObjectElement.inlineObjectId, inlineObjects: t }))));
 }
-function A({ textRun: n }) {
-  let t = n.content || "";
+function w({ textRun: r }) {
+  let t = r.content || "";
   if (!t) return null;
   t = t.replace(/\u000b/g, "");
-  const e = I(n.textStyle), r = (s, a) => {
-    if (a.length === 0) return s;
-    const [l, ...i] = a, u = l.tag;
-    return /* @__PURE__ */ c.createElement(u, { ...l.attrs || {} }, r(s, i));
+  const e = I(r.textStyle), n = (l, a) => {
+    if (a.length === 0) return l;
+    const [i, ...o] = a, s = i.tag;
+    return /* @__PURE__ */ u.createElement(s, { ...i.attrs || {} }, n(l, o));
   };
-  return /* @__PURE__ */ c.createElement(c.Fragment, null, r(t, e));
+  return /* @__PURE__ */ u.createElement(u.Fragment, null, n(t, e));
 }
-function G({ items: n, inlineObjects: t, lists: e }) {
-  const r = x(n);
-  return /* @__PURE__ */ c.createElement(O, { nodes: r, inlineObjects: t, lists: e });
+function F({ items: r, inlineObjects: t, lists: e }) {
+  const n = x(r);
+  return /* @__PURE__ */ u.createElement(A, { nodes: n, inlineObjects: t, lists: e });
 }
-function O({ nodes: n, inlineObjects: t, lists: e }) {
+function A({ nodes: r, inlineObjects: t, lists: e }) {
   var p, g;
-  if (n.length === 0) return null;
-  const r = n[0], s = (g = (p = r.item.paragraph) == null ? void 0 : p.bullet) == null ? void 0 : g.listId, a = r.level, { tag: l, styleType: i } = L(s, a, e), u = l, o = { listStyleType: i };
-  return /* @__PURE__ */ c.createElement(u, { style: o }, n.map((h, m) => {
-    var b, C;
-    return /* @__PURE__ */ c.createElement("li", { key: m }, (C = (b = h.item.paragraph) == null ? void 0 : b.elements) == null ? void 0 : C.map((T, j) => /* @__PURE__ */ c.createElement(c.Fragment, { key: j }, T.textRun && /* @__PURE__ */ c.createElement(A, { textRun: T.textRun }))), h.children.length > 0 && /* @__PURE__ */ c.createElement(O, { nodes: h.children, inlineObjects: t, lists: e }));
+  if (r.length === 0) return null;
+  const n = r[0], l = (g = (p = n.item.paragraph) == null ? void 0 : p.bullet) == null ? void 0 : g.listId, a = n.level, { tag: i, styleType: o } = R(l, a, e), s = i, c = { listStyleType: o };
+  return /* @__PURE__ */ u.createElement(s, { style: c }, r.map((d, h) => {
+    var m, f;
+    return /* @__PURE__ */ u.createElement("li", { key: h }, (f = (m = d.item.paragraph) == null ? void 0 : m.elements) == null ? void 0 : f.map((S, N) => /* @__PURE__ */ u.createElement(u.Fragment, { key: N }, S.textRun && /* @__PURE__ */ u.createElement(w, { textRun: S.textRun }))), d.children.length > 0 && /* @__PURE__ */ u.createElement(A, { nodes: d.children, inlineObjects: t, lists: e }));
   }));
 }
-function U({ table: n, inlineObjects: t, lists: e }) {
-  var r;
-  return /* @__PURE__ */ c.createElement("table", null, /* @__PURE__ */ c.createElement("tbody", null, (r = n.tableRows) == null ? void 0 : r.map((s, a) => {
-    var l;
-    return /* @__PURE__ */ c.createElement("tr", { key: a }, (l = s.tableCells) == null ? void 0 : l.map((i, u) => {
-      var o, p;
-      return /* @__PURE__ */ c.createElement("td", { key: u, colSpan: ((o = i.tableCellStyle) == null ? void 0 : o.columnSpan) || 1, rowSpan: ((p = i.tableCellStyle) == null ? void 0 : p.rowSpan) || 1 }, i.content && k(i.content, t, e));
+function M({ table: r, inlineObjects: t, lists: e }) {
+  var n;
+  return /* @__PURE__ */ u.createElement("table", null, /* @__PURE__ */ u.createElement("tbody", null, (n = r.tableRows) == null ? void 0 : n.map((l, a) => {
+    var i;
+    return /* @__PURE__ */ u.createElement("tr", { key: a }, (i = l.tableCells) == null ? void 0 : i.map((o, s) => {
+      var c, p;
+      return /* @__PURE__ */ u.createElement("td", { key: s, colSpan: ((c = o.tableCellStyle) == null ? void 0 : c.columnSpan) || 1, rowSpan: ((p = o.tableCellStyle) == null ? void 0 : p.rowSpan) || 1 }, o.content && v(o.content, t, e));
     }));
   })));
 }
-function F({ objectId: n, inlineObjects: t }) {
-  var l, i, u;
-  const [e, r] = c.useState(!1);
-  if (!n || !t) return null;
-  const s = (i = (l = t[n]) == null ? void 0 : l.inlineObjectProperties) == null ? void 0 : i.embeddedObject;
-  if (!((u = s == null ? void 0 : s.imageProperties) != null && u.contentUri)) return null;
-  const a = s.imageProperties.contentUri;
-  return /* @__PURE__ */ c.createElement(c.Fragment, null, /* @__PURE__ */ c.createElement(
+function G({ objectId: r, inlineObjects: t }) {
+  var i, o, s;
+  const [e, n] = u.useState(!1);
+  if (!r || !t) return null;
+  const l = (o = (i = t[r]) == null ? void 0 : i.inlineObjectProperties) == null ? void 0 : o.embeddedObject;
+  if (!((s = l == null ? void 0 : l.imageProperties) != null && s.contentUri)) return null;
+  const a = l.imageProperties.contentUri;
+  return /* @__PURE__ */ u.createElement(u.Fragment, null, /* @__PURE__ */ u.createElement(
     "img",
     {
       src: a,
       alt: "Embedded",
-      onClick: () => r(!0),
+      onClick: () => n(!0),
       style: { cursor: "pointer" }
     }
-  ), e && /* @__PURE__ */ c.createElement(
+  ), e && /* @__PURE__ */ u.createElement(
     "div",
     {
       style: {
@@ -290,30 +389,30 @@ function F({ objectId: n, inlineObjects: t }) {
         zIndex: 9999,
         cursor: "pointer"
       },
-      onClick: () => r(!1)
+      onClick: () => n(!1)
     },
-    /* @__PURE__ */ c.createElement("img", { src: a, style: { maxWidth: "90%", maxHeight: "90%", objectFit: "contain" } })
+    /* @__PURE__ */ u.createElement("img", { src: a, style: { maxWidth: "90%", maxHeight: "90%", objectFit: "contain" } })
   ));
 }
-const z = ({ doc: n, className: t }) => {
-  const { html: e, toc: r } = N(n);
-  return n ? /* @__PURE__ */ c.createElement("div", { className: t }, /* @__PURE__ */ c.createElement("div", { className: "gdoc-content" }, e), r.length > 0 && /* @__PURE__ */ c.createElement("nav", { className: "gdoc-toc" }, /* @__PURE__ */ c.createElement("ul", null, r.map((s) => /* @__PURE__ */ c.createElement("li", { key: s.id, className: `gdoc-toc-level-${s.level}` }, /* @__PURE__ */ c.createElement("a", { href: `#${s.id}` }, s.text)))))) : null;
-}, $ = ({ doc: n, className: t }) => {
-  const { html: e } = N(n);
-  return n ? /* @__PURE__ */ c.createElement("div", { className: t }, e) : null;
+const B = ({ doc: r, className: t }) => {
+  const { html: e, toc: n } = D(r);
+  return r ? /* @__PURE__ */ u.createElement("div", { className: t }, /* @__PURE__ */ u.createElement("div", { className: "gdoc-content" }, e), n.length > 0 && /* @__PURE__ */ u.createElement("nav", { className: "gdoc-toc" }, /* @__PURE__ */ u.createElement("ul", null, n.map((l) => /* @__PURE__ */ u.createElement("li", { key: l.id, className: `gdoc-toc-level-${l.level}` }, /* @__PURE__ */ u.createElement("a", { href: `#${l.id}` }, l.text)))))) : null;
+}, H = ({ doc: r, className: t }) => {
+  const { html: e } = D(r);
+  return r ? /* @__PURE__ */ u.createElement("div", { className: t }, e) : null;
 };
 export {
-  $ as GDocContent,
-  W as GDocScribe,
-  z as GDocViewer,
+  H as GDocContent,
+  $ as GDocScribe,
+  B as GDocViewer,
   x as buildListTree,
-  P as extractHeadings,
-  v as getAlignmentStyle,
-  R as getHeadingTag,
-  L as getListTagAndStyle,
-  E as getParagraphText,
+  _ as extractHeadings,
+  k as getAlignmentStyle,
+  L as getHeadingTag,
+  R as getListTagAndStyle,
+  y as getParagraphText,
   I as getTextTags,
-  f as processContent,
-  y as slugify,
-  N as useDocs
+  b as processContent,
+  C as slugify,
+  D as useDocs
 };

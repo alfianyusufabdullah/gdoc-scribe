@@ -4,7 +4,10 @@ export declare class GDocScribe {
     private inlineObjects;
     constructor(doc: GoogleDoc);
     render(target: HTMLElement): void;
+    private renderCodeBlock;
     private renderParagraph;
+    private getDimensionStyle;
+    private getColorStyle;
     private renderTextRun;
     private renderListGroup;
     private renderListTree;

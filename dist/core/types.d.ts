@@ -69,9 +69,25 @@ export interface ParagraphElement {
     horizontalRule?: HorizontalRule;
     richLink?: RichLink;
 }
+export interface Dimension {
+    magnitude?: number | null;
+    unit?: string | null;
+}
+export interface OptionalColor {
+    color?: Color;
+}
+export interface Shading {
+    backgroundColor?: OptionalColor;
+}
 export interface ParagraphStyle {
     namedStyleType?: string | null;
     alignment?: string | null;
+    indentStart?: Dimension;
+    indentEnd?: Dimension;
+    indentFirstLine?: Dimension;
+    spaceAbove?: Dimension;
+    spaceBelow?: Dimension;
+    shading?: Shading;
 }
 export interface Bullet {
     listId?: string | null;
@@ -172,7 +188,12 @@ export interface ListGroupBlock {
     type: 'list_group';
     items: StructuralElement[];
 }
-export type ProcessedBlock = StructuralElement | ListGroupBlock;
+export interface CodeBlock {
+    type: 'code_block';
+    language: string;
+    content: string;
+}
+export type ProcessedBlock = StructuralElement | ListGroupBlock | CodeBlock;
 export interface ListItemNode {
     item: StructuralElement;
     children: ListItemNode[];
