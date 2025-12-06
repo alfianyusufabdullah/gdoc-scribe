@@ -1,8 +1,9 @@
-import { GoogleDoc } from '../core/types';
+import { GoogleDoc, TocItem } from '../core/types';
 export declare class GDocScribe {
     private doc;
     private inlineObjects;
     constructor(doc: GoogleDoc);
+    getToc(): TocItem[];
     render(target: HTMLElement): void;
     private renderCodeBlock;
     private renderParagraph;
