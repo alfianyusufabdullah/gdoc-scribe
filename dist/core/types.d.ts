@@ -186,6 +186,7 @@ export interface GoogleDoc {
 }
 export interface ListGroupBlock {
     type: 'list_group';
+    listId?: string;
     items: StructuralElement[];
 }
 export interface CodeBlock {
