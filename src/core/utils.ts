@@ -18,9 +18,61 @@ export const getParagraphText = (elements: ParagraphElement[]): string => {
 export const processContent = (content: StructuralElement[]): ProcessedBlock[] => {
     const processed: ProcessedBlock[] = [];
     let currentListGroup: ListGroupBlock | null = null;
+    let currentCodeBlock: { type: 'code_block', language: string, content: string[] } | null = null;
+
     if (!content) return [];
 
-    content.forEach((item) => {
+    for (let i = 0; i < content.length; i++) {
+        const item = content[i];
+        const text = item.paragraph ? getParagraphText(item.paragraph.elements || []) : '';
+
+        // Check for Code Block Start
+        if (!currentCodeBlock && text.trim().startsWith('```')) {
+            const trimmedText = text.trim();
+            // Check if it's a single-paragraph code block (starts and ends with ```)
+            // We use a simple check first to avoid complex regex if possible, or just regex
+            // Regex: ^```(\w*)([\s\S]*?)```$
+            // Note: We need to handle cases where content might be empty or just whitespace
+
+            const singleBlockMatch = trimmedText.match(/^```(\w*)\s*([\s\S]*?)\s*```$/);
+
+            if (singleBlockMatch && trimmedText.length > 3) {
+                processed.push({
+                    type: 'code_block',
+                    language: singleBlockMatch[1] || '',
+                    content: singleBlockMatch[2]
+                });
+                continue;
+            }
+
+            // Multi-paragraph start
+            const language = text.trim().replace(/^```/, '').trim();
+            currentCodeBlock = {
+                type: 'code_block',
+                language: language,
+                content: []
+            };
+            continue;
+        }
+
+        // Check for Code Block End
+        if (currentCodeBlock && text.trim() === '```') {
+            processed.push({
+                type: 'code_block',
+                language: currentCodeBlock.language,
+                content: currentCodeBlock.content.join('\n')
+            });
+            currentCodeBlock = null;
+            continue;
+        }
+
+        // Inside Code Block
+        if (currentCodeBlock) {
+            currentCodeBlock.content.push(text);
+            continue;
+        }
+
+        // Existing List Grouping Logic
         if (item.paragraph && item.paragraph.bullet) {
             const listId = item.paragraph.bullet.listId;
 
@@ -39,7 +91,17 @@ export const processContent = (content: StructuralElement[]): ProcessedBlock[] =
             currentListGroup = null;
             processed.push(item);
         }
-    });
+    }
+
+    // Handle unclosed code block (optional, but good for safety)
+    if (currentCodeBlock) {
+        processed.push({
+            type: 'code_block',
+            language: currentCodeBlock.language,
+            content: currentCodeBlock.content.join('\n')
+        });
+    }
+
     return processed;
 };
 
