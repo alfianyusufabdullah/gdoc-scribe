@@ -191,6 +191,7 @@ export interface GoogleDoc {
 // Internal processed types
 export interface ListGroupBlock {
     type: 'list_group';
+    listId?: string;
     items: StructuralElement[];
 }
 

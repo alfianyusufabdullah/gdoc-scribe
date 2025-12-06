@@ -72,21 +72,19 @@ export const processContent = (content: StructuralElement[]): ProcessedBlock[] =
             continue;
         }
 
-        // Existing List Grouping Logic
+        // List Grouping Logic
         if (item.paragraph && item.paragraph.bullet) {
             const listId = item.paragraph.bullet.listId;
-
-            if (currentListGroup) {
-                const currentListId = currentListGroup.items[0].paragraph?.bullet?.listId;
-                if (currentListId !== listId) {
-                    currentListGroup = { type: 'list_group', items: [] };
-                    processed.push(currentListGroup);
-                }
-            } else {
-                currentListGroup = { type: 'list_group', items: [] };
+            if (!currentListGroup || currentListGroup.listId !== listId) {
+                currentListGroup = {
+                    type: 'list_group',
+                    listId: listId || '',
+                    items: [item]
+                };
                 processed.push(currentListGroup);
+            } else {
+                currentListGroup.items.push(item);
             }
-            currentListGroup.items.push(item);
         } else {
             currentListGroup = null;
             processed.push(item);
@@ -148,4 +146,19 @@ export const extractHeadings = (content: StructuralElement[]): TocItem[] => {
     });
 
     return headings;
+};
+
+export interface InlineContent {
+    type: 'text' | 'code';
+    content: string;
+}
+
+export const parseInlineContent = (text: string): InlineContent[] => {
+    const parts = text.split(/(`[^`]+`)/g);
+    return parts.map(part => {
+        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+            return { type: 'code', content: part.slice(1, -1) } as InlineContent;
+        }
+        return { type: 'text', content: part } as InlineContent;
+    }).filter(part => part.content !== '');
 };

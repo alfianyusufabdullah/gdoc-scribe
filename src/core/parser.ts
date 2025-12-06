@@ -1,4 +1,4 @@
-import { TextStyle, ParagraphStyle, Lists } from './types';
+import { TextStyle, ParagraphStyle, Lists, InlineObjects, Dimension, Color } from './types';
 
 export interface SemanticTag {
     tag: string;
@@ -108,4 +108,33 @@ export const getAlignmentStyle = (alignment: string | undefined): string | undef
         case 'JUSTIFIED': return 'justify';
         default: return undefined;
     }
+};
+
+export const getImageData = (objectId: string | null | undefined, inlineObjects: InlineObjects | null | undefined): { src: string; alt: string } | null => {
+    if (!objectId || !inlineObjects) return null;
+    const embeddedObject = inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject;
+    if (!embeddedObject?.imageProperties?.contentUri) return null;
+
+    return {
+        src: embeddedObject.imageProperties.contentUri,
+        alt: "Embedded Image" // Google Docs API doesn't always provide alt text easily in this structure, defaulting for now
+    };
+};
+
+export const getDimensionStyle = (dimension: Dimension | undefined | null): string | null => {
+    if (dimension?.magnitude && dimension?.unit) {
+        return `${dimension.magnitude}${dimension.unit.toLowerCase()}`;
+    }
+    return null;
+};
+
+export const getColorStyle = (color: Color | undefined | null): string | null => {
+    if (color?.rgbColor) {
+        const { red, green, blue } = color.rgbColor;
+        const r = Math.round((red || 0) * 255);
+        const g = Math.round((green || 0) * 255);
+        const b = Math.round((blue || 0) * 255);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    return null;
 };
