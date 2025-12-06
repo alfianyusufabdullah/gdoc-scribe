@@ -1,5 +1,5 @@
-import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects } from '../core/types';
-import { processContent, buildListTree, getParagraphText, slugify, parseInlineContent } from '../core/utils';
+import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects, TocItem } from '../core/types';
+import { processContent, buildListTree, getParagraphText, slugify, parseInlineContent, extractHeadings } from '../core/utils';
 import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
 
 export class GDocScribe {
@@ -9,6 +9,11 @@ export class GDocScribe {
     constructor(doc: GoogleDoc) {
         this.doc = doc;
         this.inlineObjects = doc.inlineObjects || null;
+    }
+
+    public getToc(): TocItem[] {
+        if (!this.doc.body?.content) return [];
+        return extractHeadings(this.doc.body.content);
     }
 
     public render(target: HTMLElement): void {
