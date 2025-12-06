@@ -90,6 +90,27 @@ You can use the library directly in the browser via a CDN (like unpkg or jsdeliv
 </script>
 ```
 
+## Syntax Highlighting
+
+`gdoc-scribe` renders code blocks as semantic `<pre><code class="language-...">...</code></pre>` elements. It does **not** include a syntax highlighting library by default, giving you the freedom to choose your preferred solution (e.g., [highlight.js](https://highlightjs.org/), [Prism.js](https://prismjs.com/)).
+
+### Example with highlight.js
+
+1.  Include the CSS and JS:
+    ```html
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    ```
+
+2.  Initialize after rendering:
+    ```javascript
+    const scribe = new GDocScribe.GDocScribe(data);
+    scribe.render(document.getElementById('app'));
+    
+    // Apply highlighting
+    hljs.highlightAll();
+    ```
+
 ## Development
 
 ### Prerequisites
