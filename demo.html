@@ -6,6 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GDoc-Scribe Studio</title>
     <script src="./dist/gdoc-scribe.umd.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    typography: {
+                        DEFAULT: {
+                            css: {
+                                maxWidth: 'none',
+                            },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -351,7 +367,7 @@
             </div>
             <div class="preview-scroll-area">
                 <div class="paper">
-                    <div id="app"></div>
+                    <div id="app" class="prose prose-slate max-w-none"></div>
                 </div>
             </div>
         </div>
@@ -955,7 +971,7 @@
                                 }
                             ],
                             "paragraphStyle": {
-                                "namedStyleType": "NORMAL_TEXT",
+                                "namedStgobyleType": "NORMAL_TEXT",
                                 "direction": "LEFT_TO_RIGHT",
                                 "indentFirstLine": {
                                     "magnitude": 90,
