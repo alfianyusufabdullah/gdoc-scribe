@@ -28,6 +28,7 @@ jobs:
         run: |
           mkdir demo-build
           cp demo.html demo-build/index.html
+          cp mock-data.js demo-build/mock-data.js
           cp -r dist demo-build/dist
 
       - name: Deploy to GitHub Pages
