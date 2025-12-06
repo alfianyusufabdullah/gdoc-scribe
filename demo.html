@@ -26,6 +26,20 @@
             display: block;
             overflow-x: auto;
         }
+
+        /* Smooth scrolling and spacing for anchor links */
+        .scroll-container {
+            scroll-padding-top: 2rem;
+        }
+
+        .prose h1,
+        .prose h2,
+        .prose h3,
+        .prose h4,
+        .prose h5,
+        .prose h6 {
+            scroll-margin-top: 2rem;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -65,11 +79,18 @@
             box-sizing: border-box;
         }
 
+        html {
+            height: 100%;
+            overflow: hidden;
+            /* Prevent root scroll */
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
             padding: 0;
-            height: 100vh;
+            width: 100vw;
+            height: 100%;
             display: flex;
             overflow: hidden;
             background-color: var(--bg-editor);
@@ -79,14 +100,21 @@
         /* Layout */
         .app-container {
             display: flex;
+            flex: 1;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+            position: fixed;
+            /* Force fixed context to prevent body scroll leaks */
+            top: 0;
+            left: 0;
         }
 
         /* Editor Pane (Left) */
         .editor-pane {
-            width: 40%;
-            min-width: 350px;
+            width: 25%;
+            min-width: 300px;
+            height: 100%;
             background-color: var(--bg-editor);
             display: flex;
             flex-direction: column;
@@ -178,11 +206,13 @@
         /* Preview Pane (Right) */
         .preview-pane {
             flex: 1;
+            height: 100%;
             background-color: var(--bg-preview);
             position: relative;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
         }
 
         .preview-header {
@@ -237,8 +267,10 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            transform: translateY(150%);
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(1rem);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             z-index: 100;
             font-size: 0.9rem;
             font-weight: 500;
@@ -247,6 +279,8 @@
 
         .toast.show {
             transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
         }
 
         .toast-icon {
@@ -346,9 +380,29 @@
                 </div>
                 <span id="wordCount">0 words</span>
             </div>
-            <div class="preview-scroll-area">
-                <div class="paper">
-                    <div id="app" class="prose prose-slate max-w-none"></div>
+
+            <!-- Scrollable Content Area -->
+            <div class="flex-1 overflow-y-auto bg-slate-50 scroll-container">
+                <div class="max-w-7xl mx-auto px-4 py-8 flex gap-8 items-start">
+                    <!-- Sidebar -->
+                    <aside class="w-64 flex-shrink-0 hidden lg:block sticky top-8">
+                        <h2 class="text-lg font-semibold mb-4 text-gray-900">Table of Contents</h2>
+                        <div id="toc" class="max-h-[calc(100vh-8rem)] overflow-y-auto pr-2">
+                            <p class="text-sm text-gray-400 italic">Load a document to see TOC</p>
+                        </div>
+                    </aside>
+
+                    <!-- Main Content -->
+                    <main class="flex-1 min-w-0">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 min-h-[500px]">
+                            <div id="app" class="prose prose-slate max-w-none">
+                                <div class="text-center text-gray-400 py-20">
+                                    <p class="text-lg">No document loaded</p>
+                                    <p class="text-sm">Paste JSON data above to render</p>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
                 </div>
             </div>
         </div>
@@ -412,6 +466,50 @@
                 // Render content
                 const scribe = new GDocScribe.GDocScribe(docData);
                 scribe.render(app);
+
+                // Render TOC
+                const toc = scribe.getToc();
+                const tocContainer = document.getElementById('toc');
+                tocContainer.innerHTML = '';
+
+                if (toc.length > 0) {
+                    const ul = document.createElement('ul');
+                    ul.className = 'space-y-2';
+                    toc.forEach(item => {
+                        const li = document.createElement('li');
+                        li.style.paddingLeft = `${(item.level - 1) * 1}rem`;
+
+                        const a = document.createElement('a');
+                        a.href = `#${item.id}`;
+                        a.textContent = item.text;
+                        a.className = 'text-sm text-gray-600 hover:text-blue-600 hover:underline block truncate';
+
+                        // Handle click manually to prevent root scrolling
+                        a.onclick = (e) => {
+                            e.preventDefault();
+                            const target = document.getElementById(item.id);
+                            if (target) {
+                                const container = document.querySelector('.scroll-container');
+                                // Calculate position relative to container
+                                const headerOffset = 32; // 2rem padding
+                                const elementPosition = target.getBoundingClientRect().top;
+                                const containerPosition = container.getBoundingClientRect().top;
+                                const offsetPosition = elementPosition - containerPosition + container.scrollTop - headerOffset;
+
+                                container.scrollTo({
+                                    top: offsetPosition,
+                                    behavior: "smooth"
+                                });
+                            }
+                        };
+
+                        li.appendChild(a);
+                        ul.appendChild(li);
+                    });
+                    tocContainer.appendChild(ul);
+                } else {
+                    tocContainer.innerHTML = '<p class="text-sm text-gray-400 italic">No headings found</p>';
+                }
 
                 // Apply syntax highlighting
                 hljs.highlightAll();
