@@ -136,7 +136,7 @@ You can use the library directly in the browser via a CDN (like unpkg or jsdeliv
 - `src/core`: Core logic for parsing Google Docs JSON.
 - `src/react`: React-specific components and hooks (`useDocs`).
 - `src/vanilla`: Vanilla JavaScript implementation (`GDocScribe`).
-- `demo.html`: A standalone HTML file for testing the library locally.
+- `demo/`: Contains demo applications (Vanilla JS and React).
 
 ### Testing
 
@@ -156,9 +156,9 @@ npm run build
 
 ### Local Testing
 
-You can use the included `demo.html` to test changes visually.
+You can use the included demos to test changes visually.
 1.  Build the project: `npm run build`
-2.  Open `demo.html` in your browser.
+2.  Open `demo/index.html` in your browser to choose a demo.
 
 
 ## License
