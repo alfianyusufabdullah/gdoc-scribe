@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, TocItem, InlineObjects, Lists, TextRun } from '../core/types';
-import { processContent, buildListTree, extractHeadings, getParagraphText, slugify } from '../core/utils';
-import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, SemanticTag } from '../core/parser';
+import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, TocItem, InlineObjects, Lists, TextRun, CodeBlock } from '../core/types';
+import { processContent, buildListTree, extractHeadings, getParagraphText, slugify, parseInlineContent } from '../core/utils';
+import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle, SemanticTag } from '../core/parser';
 
 interface UseDocsResult {
     html: React.ReactNode;
@@ -30,11 +30,24 @@ function renderContentBlocks(content: StructuralElement[], inlineObjects?: Inlin
         if ('type' in block && block.type === 'list_group') {
             return <ListGroup key={index} items={block.items} inlineObjects={inlineObjects} lists={lists} />;
         }
+        if ('type' in block && block.type === 'code_block') {
+            return <CodeBlockRenderer key={index} block={block} />;
+        }
         const element = block as StructuralElement;
         if (element.paragraph) return <ParagraphRenderer key={index} paragraph={element.paragraph} inlineObjects={inlineObjects} />;
         if (element.table) return <TableRenderer key={index} table={element.table} inlineObjects={inlineObjects} lists={lists} />;
         return null;
     });
+}
+
+function CodeBlockRenderer({ block }: { block: CodeBlock }) {
+    return (
+        <pre>
+            <code className={block.language ? `language-${block.language}` : undefined}>
+                {block.content}
+            </code>
+        </pre>
+    );
 }
 
 function ParagraphRenderer({ paragraph, inlineObjects }: { paragraph: Paragraph; inlineObjects?: InlineObjects | null }) {
@@ -43,7 +56,43 @@ function ParagraphRenderer({ paragraph, inlineObjects }: { paragraph: Paragraph;
     const Tag = tagName as keyof React.JSX.IntrinsicElements;
 
     const alignment = getAlignmentStyle(style?.alignment || undefined);
-    const cssStyle = alignment ? { textAlign: alignment as any } : undefined;
+    const cssStyle: React.CSSProperties = {};
+
+    if (alignment) cssStyle.textAlign = alignment as any;
+
+    // Indentation
+    if (style?.indentStart) {
+        const val = getDimensionStyle(style.indentStart);
+        if (val) cssStyle.paddingLeft = val;
+    }
+    if (style?.indentEnd) {
+        const val = getDimensionStyle(style.indentEnd);
+        if (val) cssStyle.paddingRight = val;
+    }
+    if (style?.indentFirstLine) {
+        const val = getDimensionStyle(style.indentFirstLine);
+        if (val) cssStyle.textIndent = val;
+    }
+
+    // Spacing
+    if (style?.spaceAbove) {
+        const val = getDimensionStyle(style.spaceAbove);
+        if (val) cssStyle.marginTop = val;
+    }
+    if (style?.spaceBelow) {
+        const val = getDimensionStyle(style.spaceBelow);
+        if (val) cssStyle.marginBottom = val;
+    }
+
+    // Shading
+    if (style?.shading?.backgroundColor?.color) {
+        const bgColor = getColorStyle(style.shading.backgroundColor.color);
+        if (bgColor) {
+            cssStyle.backgroundColor = bgColor;
+            cssStyle.padding = '10px';
+            cssStyle.borderRadius = '4px';
+        }
+    }
 
     let id: string | undefined;
     if (tagName.startsWith('h')) {
@@ -80,7 +129,28 @@ function TextRunRenderer({ textRun }: { textRun: TextRun }) {
         return <Tag {...(currentTag.attrs || {})}>{wrapWithTags(text, rest)}</Tag>;
     };
 
-    return <>{wrapWithTags(content, tags)}</>;
+    const parts = parseInlineContent(content);
+
+    return (
+        <>
+            {parts.map((part, index) => {
+                if (part.type === 'code') {
+                    // Wrap code with other tags if present
+                    return (
+                        <React.Fragment key={index}>
+                            {wrapWithTags(part.content, [{ tag: 'code' }, ...tags])}
+                        </React.Fragment>
+                    );
+                } else {
+                    return (
+                        <React.Fragment key={index}>
+                            {wrapWithTags(part.content, tags)}
+                        </React.Fragment>
+                    );
+                }
+            })}
+        </>
+    );
 }
 
 function ListGroup({ items, inlineObjects, lists }: { items: StructuralElement[]; inlineObjects?: InlineObjects | null; lists?: Lists | null }) {
@@ -144,17 +214,14 @@ function TableRenderer({ table, inlineObjects, lists }: { table: Table; inlineOb
 function ImageRenderer({ objectId, inlineObjects }: { objectId: string | null | undefined; inlineObjects?: InlineObjects | null }) {
     const [isOpen, setIsOpen] = React.useState(false);
 
-    if (!objectId || !inlineObjects) return null;
-    const embeddedObject = inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject;
-    if (!embeddedObject?.imageProperties?.contentUri) return null;
-
-    const src = embeddedObject.imageProperties.contentUri;
+    const imageData = getImageData(objectId, inlineObjects);
+    if (!imageData) return null;
 
     return (
         <>
             <img
-                src={src}
-                alt="Embedded"
+                src={imageData.src}
+                alt={imageData.alt}
                 onClick={() => setIsOpen(true)
                 }
                 style={{ cursor: 'pointer' }}
@@ -172,7 +239,7 @@ function ImageRenderer({ objectId, inlineObjects }: { objectId: string | null | 
                         onClick={() => setIsOpen(false)
                         }
                     >
-                        <img src={src} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
+                        <img src={imageData.src} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
                     </div>
                 )}
         </>
