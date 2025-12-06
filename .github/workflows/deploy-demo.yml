@@ -27,8 +27,9 @@ jobs:
       - name: Prepare demo
         run: |
           mkdir demo-build
-          cp -r demo/* demo-build/
+          cp -r demo demo-build/
           cp -r dist demo-build/dist
+          echo '<!DOCTYPE html><meta http-equiv="refresh" content="0;url=demo/">' > demo-build/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
