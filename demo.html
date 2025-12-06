@@ -7,6 +7,26 @@
     <title>GDoc-Scribe Studio</title>
     <script src="./dist/gdoc-scribe.umd.js"></script>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        /* Custom tweaks for demo */
+        .prose pre {
+            background-color: #f6f8fa;
+            /* GitHub light bg */
+            color: #24292e;
+            padding: 0;
+            /* Let hljs handle padding or reset */
+        }
+
+        .prose pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 1em;
+            display: block;
+            overflow-x: auto;
+        }
+    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -389,8 +409,12 @@
             app.innerHTML = ''; // Clear previous render
             try {
                 console.log('Initializing GDocScribe...');
+                // Render content
                 const scribe = new GDocScribe.GDocScribe(docData);
                 scribe.render(app);
+
+                // Apply syntax highlighting
+                hljs.highlightAll();
                 console.log('Render complete.');
                 showToast('Document rendered successfully', 'success');
                 updateStats();
