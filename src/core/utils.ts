@@ -1,4 +1,4 @@
-import { StructuralElement, ProcessedBlock, ListGroupBlock, ListItemNode, TocItem, ParagraphElement } from './types';
+import { StructuralElement, ProcessedBlock, ListGroupBlock, ListItemNode, TocItem, ParagraphElement, Transformer } from './types';
 
 export const slugify = (text: string): string => {
     return text
@@ -15,7 +15,7 @@ export const getParagraphText = (elements: ParagraphElement[]): string => {
         .trim();
 };
 
-export const processContent = (content: StructuralElement[]): ProcessedBlock[] => {
+export const processContent = (content: StructuralElement[], transformers: Transformer[] = []): ProcessedBlock[] => {
     const processed: ProcessedBlock[] = [];
     let currentListGroup: ListGroupBlock | null = null;
     let currentCodeBlock: { type: 'code_block', language: string, content: string[] } | null = null;
@@ -100,7 +100,7 @@ export const processContent = (content: StructuralElement[]): ProcessedBlock[] =
         });
     }
 
-    return processed;
+    return transformers.reduce((acc, transformer) => transformer(acc), processed);
 };
 
 export const buildListTree = (items: StructuralElement[]): ListItemNode[] => {
