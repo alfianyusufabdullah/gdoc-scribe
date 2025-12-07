@@ -1,14 +1,30 @@
-import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects, TocItem } from '../core/types';
+import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects, TocItem, Transformer, CodeBlock, ClassNames } from '../core/types';
 import { processContent, buildListTree, getParagraphText, slugify, parseInlineContent, extractHeadings } from '../core/utils';
 import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
+
+export interface VanillaRenderers {
+    paragraph?: (p: Paragraph, inlineObjects?: InlineObjects | null) => HTMLElement;
+    list_group?: (items: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: any) => HTMLElement;
+    code_block?: (block: CodeBlock) => HTMLElement;
+    table?: (table: Table, inlineObjects?: InlineObjects | null, lists?: any) => HTMLElement;
+    image?: (objectId: string | null | undefined, inlineObjects?: InlineObjects | null) => HTMLElement | null;
+}
+
+export interface ScribeOptions {
+    renderers?: VanillaRenderers;
+    transformers?: Transformer[];
+    classNames?: ClassNames;
+}
 
 export class GDocScribe {
     private doc: GoogleDoc;
     private inlineObjects: InlineObjects | null;
+    private options: ScribeOptions;
 
-    constructor(doc: GoogleDoc) {
+    constructor(doc: GoogleDoc, options: ScribeOptions = {}) {
         this.doc = doc;
         this.inlineObjects = doc.inlineObjects || null;
+        this.options = options;
     }
 
     public getToc(): TocItem[] {
@@ -20,26 +36,44 @@ export class GDocScribe {
         target.innerHTML = ''; // Clear target
         if (!this.doc.body?.content) return;
 
-        const blocks = processContent(this.doc.body.content);
+        const blocks = processContent(this.doc.body.content, this.options.transformers);
 
         blocks.forEach(block => {
-            if ('type' in block && block.type === 'list_group') {
-                target.appendChild(this.renderListGroup(block.items));
-            } else if ('type' in block && block.type === 'code_block') {
-                target.appendChild(this.renderCodeBlock(block));
-            } else {
-                const element = block as StructuralElement;
-                if (element.paragraph) {
-                    target.appendChild(this.renderParagraph(element.paragraph));
-                } else if (element.table) {
-                    target.appendChild(this.renderTable(element.table));
+            try {
+                if ('type' in block && block.type === 'list_group') {
+                    const renderer = this.options.renderers?.list_group || this.renderListGroup.bind(this);
+                    target.appendChild(renderer(block.items, this.inlineObjects, this.doc.lists));
+                } else if ('type' in block && block.type === 'code_block') {
+                    const renderer = this.options.renderers?.code_block || this.renderCodeBlock.bind(this);
+                    target.appendChild(renderer(block));
+                } else {
+                    const element = block as StructuralElement;
+                    if (element.paragraph) {
+                        const renderer = this.options.renderers?.paragraph || this.renderParagraph.bind(this);
+                        target.appendChild(renderer(element.paragraph, this.inlineObjects));
+                    } else if (element.table) {
+                        const renderer = this.options.renderers?.table || this.renderTable.bind(this);
+                        target.appendChild(renderer(element.table, this.inlineObjects, this.doc.lists));
+                    }
                 }
+            } catch (e) {
+                console.error("Error rendering block:", e);
+                const errorDiv = document.createElement('div');
+                errorDiv.style.color = 'red';
+                errorDiv.style.border = '1px dashed red';
+                errorDiv.style.padding = '8px';
+                errorDiv.textContent = 'Error rendering block';
+                target.appendChild(errorDiv);
             }
         });
     }
 
-    private renderCodeBlock(block: any): HTMLElement {
+    private renderCodeBlock(block: CodeBlock): HTMLElement {
         const pre = document.createElement('pre');
+        if (this.options.classNames?.code_block) {
+            pre.className = this.options.classNames.code_block;
+        }
+
         const code = document.createElement('code');
 
         if (block.language) {
@@ -52,10 +86,21 @@ export class GDocScribe {
         return pre;
     }
 
-    private renderParagraph(paragraph: Paragraph): HTMLElement {
+    private renderParagraph(paragraph: Paragraph, inlineObjects?: InlineObjects | null): HTMLElement {
         const style = paragraph.paragraphStyle;
         const tagName = getHeadingTag(style);
         const el = document.createElement(tagName);
+
+        // Apply classNames
+        if (this.options.classNames) {
+            if (this.options.classNames.paragraph) el.classList.add(this.options.classNames.paragraph);
+            if (tagName === 'h1' && this.options.classNames.h1) el.classList.add(this.options.classNames.h1);
+            if (tagName === 'h2' && this.options.classNames.h2) el.classList.add(this.options.classNames.h2);
+            if (tagName === 'h3' && this.options.classNames.h3) el.classList.add(this.options.classNames.h3);
+            if (tagName === 'h4' && this.options.classNames.h4) el.classList.add(this.options.classNames.h4);
+            if (tagName === 'h5' && this.options.classNames.h5) el.classList.add(this.options.classNames.h5);
+            if (tagName === 'h6' && this.options.classNames.h6) el.classList.add(this.options.classNames.h6);
+        }
 
         const alignment = getAlignmentStyle(style?.alignment || undefined);
         if (alignment) {
@@ -108,7 +153,8 @@ export class GDocScribe {
                     const span = this.renderTextRun(pElem.textRun);
                     el.appendChild(span);
                 } else if (pElem.inlineObjectElement) {
-                    const img = this.renderImage(pElem.inlineObjectElement.inlineObjectId);
+                    const renderer = this.options.renderers?.image || this.renderImage.bind(this);
+                    const img = renderer(pElem.inlineObjectElement.inlineObjectId, inlineObjects);
                     if (img) el.appendChild(img);
                 }
             });
@@ -209,25 +255,31 @@ export class GDocScribe {
         return fragment;
     }
 
-    private renderListGroup(items: StructuralElement[]): HTMLElement {
+    private renderListGroup(items: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
         const tree = buildListTree(items);
-        return this.renderListTree(tree);
+        return this.renderListTree(tree, inlineObjects, lists);
     }
 
-    private renderListTree(nodes: ListItemNode[]): HTMLElement {
+    private renderListTree(nodes: ListItemNode[], inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
         if (nodes.length === 0) return document.createElement('ul');
 
         const firstNode = nodes[0];
         const listId = firstNode.item.paragraph?.bullet?.listId;
         const level = firstNode.level;
 
-        const { tag, styleType } = getListTagAndStyle(listId, level, this.doc.lists);
+        const { tag, styleType } = getListTagAndStyle(listId, level, lists || this.doc.lists);
 
         const listEl = document.createElement(tag);
         listEl.style.listStyleType = styleType;
+        if (this.options.classNames?.list_group) {
+            listEl.className = this.options.classNames.list_group;
+        }
 
         nodes.forEach(node => {
             const li = document.createElement('li');
+            if (this.options.classNames?.list_item) {
+                li.className = this.options.classNames.list_item;
+            }
 
             // Render content
             if (node.item.paragraph?.elements) {
@@ -240,7 +292,7 @@ export class GDocScribe {
 
             // Render children
             if (node.children.length > 0) {
-                li.appendChild(this.renderListTree(node.children));
+                li.appendChild(this.renderListTree(node.children, inlineObjects, lists));
             }
 
             listEl.appendChild(li);
@@ -249,28 +301,47 @@ export class GDocScribe {
         return listEl;
     }
 
-    private renderTable(table: Table): HTMLElement {
+    private renderTable(table: Table, inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
         const tableEl = document.createElement('table');
+        if (this.options.classNames?.table) {
+            tableEl.className = this.options.classNames.table;
+        }
+
         const tbody = document.createElement('tbody');
         tableEl.appendChild(tbody);
 
         (table.tableRows || []).forEach(row => {
             const tr = document.createElement('tr');
+            if (this.options.classNames?.table_row) {
+                tr.className = this.options.classNames.table_row;
+            }
+
             (row.tableCells || []).forEach(cell => {
                 const td = document.createElement('td');
+                if (this.options.classNames?.table_cell) {
+                    td.className = this.options.classNames.table_cell;
+                }
+
                 if (cell.tableCellStyle?.columnSpan) td.colSpan = cell.tableCellStyle.columnSpan;
                 if (cell.tableCellStyle?.rowSpan) td.rowSpan = cell.tableCellStyle.rowSpan;
 
                 // Render cell content recursively
                 if (cell.content) {
-                    const blocks = processContent(cell.content);
+                    const blocks = processContent(cell.content, this.options.transformers);
                     blocks.forEach(block => {
+                        // Reuse main render logic for recursion if possible, but here we just do simple dispatch
+                        // Ideally we should refactor main render loop to be reusable
                         if ('type' in block && block.type === 'list_group') {
-                            td.appendChild(this.renderListGroup(block.items));
+                            const renderer = this.options.renderers?.list_group || this.renderListGroup.bind(this);
+                            td.appendChild(renderer(block.items, inlineObjects, lists));
+                        } else if ('type' in block && block.type === 'code_block') {
+                            const renderer = this.options.renderers?.code_block || this.renderCodeBlock.bind(this);
+                            td.appendChild(renderer(block));
                         } else {
                             const element = block as StructuralElement;
                             if (element.paragraph) {
-                                td.appendChild(this.renderParagraph(element.paragraph));
+                                const renderer = this.options.renderers?.paragraph || this.renderParagraph.bind(this);
+                                td.appendChild(renderer(element.paragraph, inlineObjects));
                             }
                         }
                     });
@@ -283,13 +354,17 @@ export class GDocScribe {
         return tableEl;
     }
 
-    private renderImage(objectId: string | null | undefined): HTMLElement | null {
-        const imageData = getImageData(objectId, this.inlineObjects);
+    private renderImage(objectId: string | null | undefined, inlineObjects?: InlineObjects | null): HTMLElement | null {
+        const imageData = getImageData(objectId, inlineObjects);
         if (!imageData) return null;
 
         const img = document.createElement('img');
         img.src = imageData.src;
         img.alt = imageData.alt;
+
+        if (this.options.classNames?.image) {
+            img.className = this.options.classNames.image;
+        }
 
         // Basic functional style for lightbox trigger
         img.style.cursor = 'pointer';
