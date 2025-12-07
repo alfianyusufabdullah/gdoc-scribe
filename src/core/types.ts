@@ -214,3 +214,22 @@ export interface TocItem {
     text: string;
     level: number;
 }
+
+export type Transformer = (blocks: ProcessedBlock[]) => ProcessedBlock[];
+
+export interface ClassNames {
+    paragraph?: string;
+    h1?: string;
+    h2?: string;
+    h3?: string;
+    h4?: string;
+    h5?: string;
+    h6?: string;
+    list_group?: string;
+    list_item?: string;
+    code_block?: string;
+    table?: string;
+    table_row?: string;
+    table_cell?: string;
+    image?: string;
+}
