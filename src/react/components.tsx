@@ -1,14 +1,14 @@
 import React from 'react';
 import { GoogleDoc } from '../core/types';
-import { useDocs } from './useDocs';
+import { useDocs, UseDocsOptions } from './useDocs';
 
-export interface GDocViewerProps {
+export interface GDocViewerProps extends UseDocsOptions {
     doc: GoogleDoc | null;
     className?: string;
 }
 
-export const GDocViewer: React.FC<GDocViewerProps> = ({ doc, className }) => {
-    const { html, toc } = useDocs(doc);
+export const GDocViewer: React.FC<GDocViewerProps> = ({ doc, className, renderers, transformers }) => {
+    const { html, toc } = useDocs(doc, { renderers, transformers });
 
     if (!doc) return null;
 
@@ -32,8 +32,8 @@ export const GDocViewer: React.FC<GDocViewerProps> = ({ doc, className }) => {
     );
 };
 
-export const GDocContent: React.FC<GDocViewerProps> = ({ doc, className }) => {
-    const { html } = useDocs(doc);
+export const GDocContent: React.FC<GDocViewerProps> = ({ doc, className, renderers, transformers }) => {
+    const { html } = useDocs(doc, { renderers, transformers });
     if (!doc) return null;
     return <div className={className}>{html}</div>;
 };
