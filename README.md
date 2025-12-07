@@ -12,6 +12,10 @@ A lightweight, flexible library for parsing and rendering Google Docs JSON conte
 - 📋 **Lists**: Supports nested bulleted and numbered lists.
 - 📊 **Tables**: Renders tables with row/column spans.
 - 📑 **Table of Contents**: Automatically extracts headings for TOC generation.
+- 🧩 **Plugin System**: Fully customizable renderers for any block type.
+- 🔄 **Middleware Pipeline**: Transform content before rendering (e.g., sanitize data, modify text).
+- 🎨 **Styling API**: Inject custom CSS classes (e.g., Tailwind CSS) into any element.
+- 🛡️ **Error Boundaries**: Robust error handling prevents crashes if a single block fails.
 
 ## Installation
 
@@ -25,7 +29,9 @@ yarn add gdoc-scribe
 
 ### React
 
-Use the `useDocs` hook to parse and render content.
+Use the `useDocs` hook or `GDocViewer` component to parse and render content.
+
+#### 1. Basic Usage
 
 ```tsx
 import React from 'react';
@@ -36,6 +42,7 @@ const MyDocComponent = ({ googleDocJson }) => {
 
   return (
     <div>
+      {/* Table of Contents */}
       <nav>
         <h3>Table of Contents</h3>
         <ul>
@@ -47,6 +54,7 @@ const MyDocComponent = ({ googleDocJson }) => {
         </ul>
       </nav>
       
+      {/* Document Content */}
       <article>
         {html}
       </article>
@@ -55,9 +63,125 @@ const MyDocComponent = ({ googleDocJson }) => {
 };
 ```
 
+#### 2. Styling API (Tailwind CSS Example)
+
+You can inject custom CSS classes into any element using the `classNames` prop. This is perfect for integrating with utility-first frameworks like Tailwind CSS.
+
+```tsx
+import { useDocs } from 'gdoc-scribe';
+
+const MyStyledDoc = ({ doc }) => {
+  const { html } = useDocs(doc, {
+    classNames: {
+      paragraph: 'mb-4 text-gray-800 leading-relaxed',
+      h1: 'text-4xl font-bold mb-6 text-blue-600',
+      h2: 'text-2xl font-semibold mb-4 text-gray-700',
+      code_block: 'bg-gray-900 text-white p-4 rounded-lg my-4 overflow-x-auto',
+      list_group: 'list-disc pl-6 mb-4 space-y-2',
+      table: 'min-w-full border-collapse border border-gray-300 my-6',
+      table_cell: 'border border-gray-300 p-3',
+      image: 'rounded-lg shadow-md max-w-full h-auto my-4'
+    }
+  });
+
+  return <div className="max-w-4xl mx-auto p-8">{html}</div>;
+};
+```
+
+#### 3. Custom Renderers (Plugin System)
+
+Override specific block renderers to add custom functionality.
+
+**Example: Code Block with Copy Button**
+
+```tsx
+import { useState } from 'react';
+import { GDocViewer } from 'gdoc-scribe';
+
+const CustomCodeBlock = ({ block, classNames }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(block.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className={`relative group ${classNames?.code_block}`}>
+      <button 
+        onClick={handleCopy}
+        className="absolute top-2 right-2 bg-gray-700 text-white px-2 py-1 text-xs rounded opacity-0 group-hover:opacity-100 transition"
+      >
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+      <pre>
+        <code className={`language-${block.language}`}>
+          {block.content}
+        </code>
+      </pre>
+    </div>
+  );
+};
+
+const App = ({ doc }) => (
+  <GDocViewer 
+    doc={doc} 
+    renderers={{
+      code_block: CustomCodeBlock
+    }} 
+  />
+);
+```
+
+#### 4. Transformers (Middleware)
+
+Modify content before it renders. Useful for redaction, sanitization, or injecting content.
+
+**Example: Redact Sensitive Data**
+
+```tsx
+import { useDocs } from 'gdoc-scribe';
+
+const redactConfidential = (blocks) => {
+  return blocks.map(block => {
+    // Check if it's a paragraph
+    if (block.paragraph && block.paragraph.elements) {
+      const newElements = block.paragraph.elements.map(el => {
+        if (el.textRun && el.textRun.content) {
+          // Replace "CONFIDENTIAL" with "[REDACTED]"
+          return {
+            ...el,
+            textRun: {
+              ...el.textRun,
+              content: el.textRun.content.replace(/CONFIDENTIAL/g, '[REDACTED]')
+            }
+          };
+        }
+        return el;
+      });
+      
+      return {
+        ...block,
+        paragraph: { ...block.paragraph, elements: newElements }
+      };
+    }
+    return block;
+  });
+};
+
+const SecureDoc = ({ doc }) => {
+  const { html } = useDocs(doc, {
+    transformers: [redactConfidential]
+  });
+
+  return <div>{html}</div>;
+};
+```
+
 ### Vanilla JavaScript
 
-#### ES Module (Bundler)
+#### 1. Basic Usage
 
 ```javascript
 import { GDocScribe } from 'gdoc-scribe';
@@ -69,97 +193,99 @@ const scribe = new GDocScribe(docData);
 scribe.render(container);
 ```
 
-#### Browser (CDN)
+#### 2. Styling API
 
-You can use the library directly in the browser via a CDN (like unpkg or jsdelivr).
+Pass a `classNames` object in the options to apply CSS classes.
 
-```html
-<!-- Include the UMD build -->
-<script src="https://unpkg.com/gdoc-scribe/dist/gdoc-scribe.umd.js"></script>
+```javascript
+const scribe = new GDocScribe(docData, {
+    classNames: {
+        paragraph: 'mb-4 text-lg',
+        h1: 'text-3xl font-bold',
+        code_block: 'bg-gray-100 p-4 rounded',
+        image: 'img-fluid rounded'
+    }
+});
 
-<div id="app"></div>
-
-<script>
-  const docData = { ... }; // Your Google Doc JSON
-  const container = document.getElementById('app');
-
-  // The library is exposed as a global variable 'GDocScribe'
-  // Note: Access the class via GDocScribe.GDocScribe
-  const scribe = new window.GDocScribe.GDocScribe(docData);
-  scribe.render(container);
-</script>
+scribe.render(document.getElementById('app'));
 ```
 
-## Syntax Highlighting
+#### 3. Custom Renderers
 
-`gdoc-scribe` renders code blocks as semantic `<pre><code class="language-...">...</code></pre>` elements. It does **not** include a syntax highlighting library by default, giving you the freedom to choose your preferred solution (e.g., [highlight.js](https://highlightjs.org/), [Prism.js](https://prismjs.com/)).
+Override render functions to return custom DOM elements.
 
-### Example with highlight.js
+```javascript
+const scribe = new GDocScribe(docData, {
+    renderers: {
+        // Custom Image Renderer
+        image: (objectId, inlineObjects) => {
+            const imgData = inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject?.imageProperties;
+            const img = document.createElement('img');
+            img.src = imgData.contentUri;
+            img.className = 'custom-image-class';
+            img.onclick = () => alert('Image clicked!');
+            return img;
+        }
+    }
+});
+```
 
-1.  Include the CSS and JS:
-    ```html
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    ```
+## API Reference
 
-2.  Initialize after rendering:
-    ```javascript
-    const scribe = new GDocScribe.GDocScribe(data);
-    scribe.render(document.getElementById('app'));
-    
-    // Apply highlighting
-    hljs.highlightAll();
-    ```
+### `UseDocsOptions` / `ScribeOptions`
+
+| Property | Type | Description |
+|Data | --- | --- |
+| `renderers` | `RendererRegistry` | Object mapping block types to custom components/functions. |
+| `transformers` | `Transformer[]` | Array of functions to transform content blocks before rendering. |
+| `classNames` | `ClassNames` | Object mapping element types to CSS class strings. |
+
+### `ClassNames` Interface
+
+| Key | Description |
+| --- | --- |
+| `paragraph` | Applied to `<p>` tags. |
+| `h1` - `h6` | Applied to heading tags. |
+| `list_group` | Applied to `<ul>` or `<ol>` tags. |
+| `list_item` | Applied to `<li>` tags. |
+| `code_block` | Applied to `<pre>` tags wrapping code. |
+| `table` | Applied to `<table>` tags. |
+| `table_row` | Applied to `<tr>` tags. |
+| `table_cell` | Applied to `<td>` tags. |
+| `image` | Applied to `<img>` tags. |
+
+## Error Handling
+
+The library includes robust error handling to prevent entire document crashes.
+
+- **React**: Uses `BlockErrorBoundary` to wrap each block. If a block fails, it renders a fallback UI (or nothing) while the rest of the document continues to show.
+- **Vanilla**: Uses `try-catch` inside the render loop. Failed blocks log an error to the console and display a visual error indicator in the DOM.
 
 ## Development
 
 ### Prerequisites
 
-- Node.js (v20 or higher recommended)
+- Node.js (v20+)
 - npm
 
 ### Setup
 
-1.  **Clone the repository**:
+1.  **Clone & Install**:
     ```bash
     git clone https://github.com/alfianyusufabdullah/gdoc-scribe.git
     cd gdoc-scribe
-    ```
-
-2.  **Install dependencies**:
-    ```bash
     npm install
     ```
 
-### Project Structure
+2.  **Run Tests**:
+    ```bash
+    npm test
+    ```
 
-- `src/core`: Core logic for parsing Google Docs JSON.
-- `src/react`: React-specific components and hooks (`useDocs`).
-- `src/vanilla`: Vanilla JavaScript implementation (`GDocScribe`).
-- `demo/`: Contains demo applications (Vanilla JS and React).
-
-### Testing
-
-Run the test suite using Vitest:
-
-```bash
-npm test
-```
-
-### Building
-
-Build the library for production (outputs to `dist/`):
-
-```bash
-npm run build
-```
-
-### Local Testing
-
-You can use the included demos to test changes visually.
-1.  Build the project: `npm run build`
-2.  Open `demo/index.html` in your browser to choose a demo.
-
+3.  **Build**:
+    ```bash
+    npm run build
+    ```
 
 ## License
 
