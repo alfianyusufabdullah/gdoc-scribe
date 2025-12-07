@@ -1,13 +1,13 @@
-import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects, TocItem, Transformer, CodeBlock, ClassNames } from '../core/types';
+import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, InlineObjects, TocItem, Transformer, ClassNames, ParagraphProps, ListGroupProps, TableProps, ImageProps, CodeBlockProps } from '../core/types';
 import { processContent, buildListTree, getParagraphText, slugify, parseInlineContent, extractHeadings } from '../core/utils';
 import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
 
 export interface VanillaRenderers {
-    paragraph?: (p: Paragraph, inlineObjects?: InlineObjects | null) => HTMLElement;
-    list_group?: (items: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: any) => HTMLElement;
-    code_block?: (block: CodeBlock) => HTMLElement;
-    table?: (table: Table, inlineObjects?: InlineObjects | null, lists?: any) => HTMLElement;
-    image?: (objectId: string | null | undefined, inlineObjects?: InlineObjects | null) => HTMLElement | null;
+    paragraph?: (props: ParagraphProps<HTMLElement | DocumentFragment>) => HTMLElement;
+    list_group?: (props: ListGroupProps<HTMLElement | DocumentFragment>) => HTMLElement;
+    code_block?: (props: CodeBlockProps) => HTMLElement;
+    table?: (props: TableProps<HTMLElement | DocumentFragment>) => HTMLElement;
+    image?: (props: ImageProps) => HTMLElement | null;
 }
 
 export interface ScribeOptions {
@@ -41,19 +41,43 @@ export class GDocScribe {
         blocks.forEach(block => {
             try {
                 if ('type' in block && block.type === 'list_group') {
-                    const renderer = this.options.renderers?.list_group || this.renderListGroup.bind(this);
-                    target.appendChild(renderer(block.items, this.inlineObjects, this.doc.lists));
+                    const children = this.renderListGroupContent(block.items, this.inlineObjects, this.doc.lists);
+                    const renderer = this.options.renderers?.list_group || this.defaultRenderListGroup.bind(this);
+                    target.appendChild(renderer({
+                        children,
+                        type: 'unordered',
+                        className: this.options.classNames?.list_group,
+                        original: { items: block.items, lists: this.doc.lists }
+                    }));
                 } else if ('type' in block && block.type === 'code_block') {
-                    const renderer = this.options.renderers?.code_block || this.renderCodeBlock.bind(this);
-                    target.appendChild(renderer(block));
+                    const renderer = this.options.renderers?.code_block || this.defaultRenderCodeBlock.bind(this);
+                    target.appendChild(renderer({
+                        content: block.content,
+                        language: block.language,
+                        className: this.options.classNames?.code_block,
+                        original: { block }
+                    }));
                 } else {
                     const element = block as StructuralElement;
                     if (element.paragraph) {
-                        const renderer = this.options.renderers?.paragraph || this.renderParagraph.bind(this);
-                        target.appendChild(renderer(element.paragraph, this.inlineObjects));
+                        const children = this.renderParagraphContent(element.paragraph, this.inlineObjects);
+                        const text = getParagraphText(element.paragraph.elements || []);
+                        const renderer = this.options.renderers?.paragraph || this.defaultRenderParagraph.bind(this);
+                        target.appendChild(renderer({
+                            children,
+                            style: element.paragraph.paragraphStyle,
+                            text,
+                            className: this.options.classNames?.paragraph,
+                            original: { paragraph: element.paragraph }
+                        }));
                     } else if (element.table) {
-                        const renderer = this.options.renderers?.table || this.renderTable.bind(this);
-                        target.appendChild(renderer(element.table, this.inlineObjects, this.doc.lists));
+                        const children = this.renderTableContent(element.table, this.inlineObjects, this.doc.lists);
+                        const renderer = this.options.renderers?.table || this.defaultRenderTable.bind(this);
+                        target.appendChild(renderer({
+                            children,
+                            className: this.options.classNames?.table,
+                            original: { table: element.table }
+                        }));
                     }
                 }
             } catch (e) {
@@ -68,32 +92,59 @@ export class GDocScribe {
         });
     }
 
-    private renderCodeBlock(block: CodeBlock): HTMLElement {
+    private defaultRenderCodeBlock(props: CodeBlockProps): HTMLElement {
         const pre = document.createElement('pre');
-        if (this.options.classNames?.code_block) {
-            pre.className = this.options.classNames.code_block;
+        if (props.className) {
+            pre.className = props.className;
         }
 
         const code = document.createElement('code');
 
-        if (block.language) {
-            code.className = `language-${block.language}`;
+        if (props.language) {
+            code.className = `language-${props.language}`;
         }
 
-        code.textContent = block.content;
+        code.textContent = props.content;
         pre.appendChild(code);
 
         return pre;
     }
 
-    private renderParagraph(paragraph: Paragraph, inlineObjects?: InlineObjects | null): HTMLElement {
-        const style = paragraph.paragraphStyle;
+    private renderParagraphContent(paragraph: Paragraph, inlineObjects?: InlineObjects | null): DocumentFragment {
+        const fragment = document.createDocumentFragment();
+        if (paragraph.elements) {
+            paragraph.elements.forEach(pElem => {
+                if (pElem.textRun) {
+                    const span = this.renderTextRun(pElem.textRun);
+                    fragment.appendChild(span);
+                } else if (pElem.inlineObjectElement) {
+                    const objectId = pElem.inlineObjectElement.inlineObjectId;
+                    const imageData = getImageData(objectId, inlineObjects);
+                    if (imageData) {
+                        const renderer = this.options.renderers?.image || this.defaultRenderImage.bind(this);
+                        const img = renderer({
+                            src: imageData.src,
+                            alt: imageData.alt,
+                            title: imageData.title,
+                            className: this.options.classNames?.image,
+                            original: { objectId, inlineObjects }
+                        });
+                        if (img) fragment.appendChild(img);
+                    }
+                }
+            });
+        }
+        return fragment;
+    }
+
+    private defaultRenderParagraph(props: ParagraphProps<HTMLElement | DocumentFragment>): HTMLElement {
+        const style = props.style;
         const tagName = getHeadingTag(style);
         const el = document.createElement(tagName);
 
         // Apply classNames
+        if (props.className) el.classList.add(props.className);
         if (this.options.classNames) {
-            if (this.options.classNames.paragraph) el.classList.add(this.options.classNames.paragraph);
             if (tagName === 'h1' && this.options.classNames.h1) el.classList.add(this.options.classNames.h1);
             if (tagName === 'h2' && this.options.classNames.h2) el.classList.add(this.options.classNames.h2);
             if (tagName === 'h3' && this.options.classNames.h3) el.classList.add(this.options.classNames.h3);
@@ -143,22 +194,10 @@ export class GDocScribe {
 
         // Add ID for headings for TOC support
         if (tagName.startsWith('h')) {
-            const text = getParagraphText(paragraph.elements || []);
-            if (text) el.id = slugify(text);
+            if (props.text) el.id = slugify(props.text);
         }
 
-        if (paragraph.elements) {
-            paragraph.elements.forEach(pElem => {
-                if (pElem.textRun) {
-                    const span = this.renderTextRun(pElem.textRun);
-                    el.appendChild(span);
-                } else if (pElem.inlineObjectElement) {
-                    const renderer = this.options.renderers?.image || this.renderImage.bind(this);
-                    const img = renderer(pElem.inlineObjectElement.inlineObjectId, inlineObjects);
-                    if (img) el.appendChild(img);
-                }
-            });
-        }
+        el.appendChild(props.children);
 
         return el;
     }
@@ -255,60 +294,64 @@ export class GDocScribe {
         return fragment;
     }
 
-    private renderListGroup(items: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
+    private renderListGroupContent(items: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: any): DocumentFragment {
         const tree = buildListTree(items);
-        return this.renderListTree(tree, inlineObjects, lists);
+        return this.renderListTreeContent(tree, inlineObjects, lists);
     }
 
-    private renderListTree(nodes: ListItemNode[], inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
-        if (nodes.length === 0) return document.createElement('ul');
+    private renderListTreeContent(nodes: ListItemNode[], inlineObjects?: InlineObjects | null, lists?: any): DocumentFragment {
+        const fragment = document.createDocumentFragment();
+        if (nodes.length === 0) return fragment;
 
         const firstNode = nodes[0];
         const listId = firstNode.item.paragraph?.bullet?.listId;
         const level = firstNode.level;
 
-        const { tag, styleType } = getListTagAndStyle(listId, level, lists || this.doc.lists);
-
-        const listEl = document.createElement(tag);
-        listEl.style.listStyleType = styleType;
-        if (this.options.classNames?.list_group) {
-            listEl.className = this.options.classNames.list_group;
-        }
+        const { styleType } = getListTagAndStyle(listId, level, lists || this.doc.lists);
 
         nodes.forEach(node => {
             const li = document.createElement('li');
             if (this.options.classNames?.list_item) {
                 li.className = this.options.classNames.list_item;
             }
+            li.style.listStyleType = styleType;
 
             // Render content
-            if (node.item.paragraph?.elements) {
-                node.item.paragraph.elements.forEach(pElem => {
-                    if (pElem.textRun) {
-                        li.appendChild(this.renderTextRun(pElem.textRun));
-                    }
-                });
+            if (node.item.paragraph) {
+                const content = this.renderParagraphContent(node.item.paragraph, inlineObjects);
+                li.appendChild(content);
             }
 
             // Render children
             if (node.children.length > 0) {
-                li.appendChild(this.renderListTree(node.children, inlineObjects, lists));
+                const childrenContent = this.renderListTreeContent(node.children, inlineObjects, lists);
+                const ul = document.createElement('ul');
+                ul.style.listStyleType = 'none';
+                ul.style.paddingLeft = '20px';
+                ul.appendChild(childrenContent);
+                li.appendChild(ul);
             }
 
-            listEl.appendChild(li);
+            fragment.appendChild(li);
         });
 
+        return fragment;
+    }
+
+    private defaultRenderListGroup(props: ListGroupProps<HTMLElement | DocumentFragment>): HTMLElement {
+        const tag = props.type === 'ordered' ? 'ol' : 'ul';
+        const listEl = document.createElement(tag);
+        if (props.className) {
+            listEl.className = props.className;
+        }
+        listEl.appendChild(props.children);
         return listEl;
     }
 
-    private renderTable(table: Table, inlineObjects?: InlineObjects | null, lists?: any): HTMLElement {
-        const tableEl = document.createElement('table');
-        if (this.options.classNames?.table) {
-            tableEl.className = this.options.classNames.table;
-        }
-
+    private renderTableContent(table: Table, inlineObjects?: InlineObjects | null, lists?: any): DocumentFragment {
+        const fragment = document.createDocumentFragment();
         const tbody = document.createElement('tbody');
-        tableEl.appendChild(tbody);
+        fragment.appendChild(tbody);
 
         (table.tableRows || []).forEach(row => {
             const tr = document.createElement('tr');
@@ -329,19 +372,36 @@ export class GDocScribe {
                 if (cell.content) {
                     const blocks = processContent(cell.content, this.options.transformers);
                     blocks.forEach(block => {
-                        // Reuse main render logic for recursion if possible, but here we just do simple dispatch
-                        // Ideally we should refactor main render loop to be reusable
                         if ('type' in block && block.type === 'list_group') {
-                            const renderer = this.options.renderers?.list_group || this.renderListGroup.bind(this);
-                            td.appendChild(renderer(block.items, inlineObjects, lists));
+                            const children = this.renderListGroupContent(block.items, inlineObjects, lists);
+                            const renderer = this.options.renderers?.list_group || this.defaultRenderListGroup.bind(this);
+                            td.appendChild(renderer({
+                                children,
+                                type: 'unordered',
+                                className: this.options.classNames?.list_group,
+                                original: { items: block.items, lists }
+                            }));
                         } else if ('type' in block && block.type === 'code_block') {
-                            const renderer = this.options.renderers?.code_block || this.renderCodeBlock.bind(this);
-                            td.appendChild(renderer(block));
+                            const renderer = this.options.renderers?.code_block || this.defaultRenderCodeBlock.bind(this);
+                            td.appendChild(renderer({
+                                content: block.content,
+                                language: block.language,
+                                className: this.options.classNames?.code_block,
+                                original: { block }
+                            }));
                         } else {
                             const element = block as StructuralElement;
                             if (element.paragraph) {
-                                const renderer = this.options.renderers?.paragraph || this.renderParagraph.bind(this);
-                                td.appendChild(renderer(element.paragraph, inlineObjects));
+                                const children = this.renderParagraphContent(element.paragraph, inlineObjects);
+                                const text = getParagraphText(element.paragraph.elements || []);
+                                const renderer = this.options.renderers?.paragraph || this.defaultRenderParagraph.bind(this);
+                                td.appendChild(renderer({
+                                    children,
+                                    style: element.paragraph.paragraphStyle,
+                                    text,
+                                    className: this.options.classNames?.paragraph,
+                                    original: { paragraph: element.paragraph }
+                                }));
                             }
                         }
                     });
@@ -350,20 +410,26 @@ export class GDocScribe {
             });
             tbody.appendChild(tr);
         });
+        return fragment;
+    }
 
+    private defaultRenderTable(props: TableProps<HTMLElement | DocumentFragment>): HTMLElement {
+        const tableEl = document.createElement('table');
+        if (props.className) {
+            tableEl.className = props.className;
+        }
+        tableEl.appendChild(props.children);
         return tableEl;
     }
 
-    private renderImage(objectId: string | null | undefined, inlineObjects?: InlineObjects | null): HTMLElement | null {
-        const imageData = getImageData(objectId, inlineObjects);
-        if (!imageData) return null;
-
+    private defaultRenderImage(props: ImageProps): HTMLElement | null {
         const img = document.createElement('img');
-        img.src = imageData.src;
-        img.alt = imageData.alt;
+        img.src = props.src;
+        img.alt = props.alt;
+        if (props.title) img.title = props.title;
 
-        if (this.options.classNames?.image) {
-            img.className = this.options.classNames.image;
+        if (props.className) {
+            img.className = props.className;
         }
 
         // Basic functional style for lightbox trigger
