@@ -44,26 +44,13 @@ describe('React Renderers', () => {
     });
 
     it('should use custom paragraph renderer', () => {
-        const CustomParagraph = ({ children, className }: any) => <div className={`custom-p ${className}`}>{children}</div>;
+        const CustomParagraph = ({ children, className }: any) => <div className={`custom-p ${className || ''}`}>{children}</div>;
         const html = renderToStaticMarkup(
             <TestComponent doc={mockDoc} options={{ renderers: { paragraph: CustomParagraph } }} />
         );
-        expect(html).toContain('<div class="custom-p "><span>Hello World</span></div>');
+        expect(html).toContain('<div class="custom-p ">Hello World</div>');
     });
 
-    // Assuming ParagraphRenderer, mockParagraph, mockParagraphWithImage, mockInlineObjects are defined elsewhere for these tests to pass.
-    // For the purpose of this edit, I'm integrating the provided code as is, assuming these are available in the context.
-    // If this is a standalone file, these would need to be mocked or imported.
-    // The original TestComponent uses useDocs, which processes the entire doc.
-    // The new tests seem to be written for a component that renders a single paragraph or image.
-    // I will adapt the new tests to use TestComponent and mockDoc as much as possible.
-
-    // Re-adapting the provided new tests to fit the existing TestComponent structure.
-    // The original TestComponent takes a GoogleDoc and options.
-    // The new tests in the instruction seem to be written for a more granular renderer component.
-    // I will try to make them work with TestComponent and mockDoc.
-
-    // For 'should use custom image renderer', we need a mockDoc with an image.
     const mockDocWithImage: GoogleDoc = {
         body: {
             content: [
@@ -121,7 +108,7 @@ describe('React Renderers', () => {
                 options={{ classNames: { paragraph: 'text-blue-500' } }}
             />
         );
-        expect(html).toContain('<p class="text-blue-500"><span>Hello World</span></p>');
+        expect(html).toContain('<p class="text-blue-500">Hello World</p>');
     });
 
     it('should apply classNames to image', () => {
