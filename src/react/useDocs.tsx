@@ -1,12 +1,15 @@
 import React, { useMemo } from 'react';
 import { GoogleDoc, StructuralElement, InlineObjects, Lists, ProcessedBlock, ClassNames, Transformer } from '../core/types';
-import { processContent, extractHeadings } from '../core/utils';
+import { processContent, extractHeadings, getParagraphText } from '../core/utils';
 import { BlockErrorBoundary } from './ErrorBoundary';
 import {
     ParagraphRenderer,
+    ParagraphContent,
     CodeBlockRenderer,
     ListGroup,
+    ListGroupContent,
     TableRenderer,
+    TableContent,
     RenderContentFn,
     RendererRegistry
 } from './renderers';
@@ -57,19 +60,43 @@ function renderContentBlocks(
         if ('type' in block) {
             if (block.type === 'list_group') {
                 Component = renderers.list_group || ListGroup;
-                props = { items: block.items, inlineObjects, lists, renderers, classNames };
+                const children = <ListGroupContent items={block.items} inlineObjects={inlineObjects} lists={lists} renderers={renderers} classNames={classNames} />;
+                props = {
+                    children,
+                    type: 'unordered', // Default, ListGroupContent handles specific styling
+                    className: classNames.list_group,
+                    original: { items: block.items, lists }
+                };
             } else if (block.type === 'code_block') {
                 Component = renderers.code_block || CodeBlockRenderer;
-                props = { block: block, classNames };
+                props = {
+                    content: block.content,
+                    language: block.language,
+                    className: classNames.code_block,
+                    original: { block }
+                };
             }
         } else {
             // It's a StructuralElement
             if (block.paragraph) {
                 Component = renderers.paragraph || ParagraphRenderer;
-                props = { paragraph: block.paragraph, inlineObjects, renderers, classNames };
+                const children = <ParagraphContent paragraph={block.paragraph} inlineObjects={inlineObjects} renderers={renderers} classNames={classNames} />;
+                const text = getParagraphText(block.paragraph.elements || []);
+                props = {
+                    children,
+                    style: block.paragraph.paragraphStyle,
+                    text,
+                    className: classNames.paragraph, // Note: ParagraphRenderer resolves specific h1-h6 classes internally if not provided here, but for custom renderer we pass the base one.
+                    original: { paragraph: block.paragraph }
+                };
             } else if (block.table) {
                 Component = renderers.table || TableRenderer;
-                props = { table: block.table, inlineObjects, lists, renderContent: recursiveRender, classNames };
+                const children = <TableContent table={block.table} inlineObjects={inlineObjects} lists={lists} renderContent={recursiveRender} classNames={classNames} />;
+                props = {
+                    children,
+                    className: classNames.table,
+                    original: { table: block.table }
+                };
             }
         }
 
