@@ -409,7 +409,7 @@ class q extends p.Component {
   }
 }
 function J({ content: r, language: t, className: e }) {
-  return /* @__PURE__ */ p.createElement("pre", { className: e }, /* @__PURE__ */ p.createElement("code", { className: t ? `language-${t}` : void 0 }, r));
+  return /* @__PURE__ */ p.createElement("pre", { className: e }, /* @__PURE__ */ p.createElement("code", { className: t ? `language - ${t} ` : void 0 }, r));
 }
 function V({ paragraph: r, inlineObjects: t, renderers: e, classNames: a }) {
   var i;
