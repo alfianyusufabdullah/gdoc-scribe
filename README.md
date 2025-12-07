@@ -180,17 +180,25 @@ const SecureDoc = ({ doc }) => {
 ```
 
 ### Vanilla JavaScript
+```html
+<!-- Include the UMD build -->
+<!-- For React Usage -->
+<script src="https://unpkg.com/gdoc-scribe/dist/gdoc-scribe.umd.js"></script>
 
-#### 1. Basic Usage
+<!-- For Vanilla Usage (Lightweight, No React Dependency) -->
+<script src="https://unpkg.com/gdoc-scribe/dist/gdoc-scribe.vanilla.umd.js"></script>
 
-```javascript
-import { GDocScribe } from 'gdoc-scribe';
+<div id="app"></div>
 
-const docData = { ... }; // Your Google Doc JSON
-const container = document.getElementById('app');
+<script>
+  const docData = { ... }; // Your Google Doc JSON
+  const container = document.getElementById('app');
 
-const scribe = new GDocScribe(docData);
-scribe.render(container);
+  // The library is exposed as a global variable 'GDocScribeLib'
+  // Access the class via GDocScribeLib.GDocScribe
+  const scribe = new window.GDocScribeLib.GDocScribe(docData);
+  scribe.render(container);
+</script>
 ```
 
 #### 2. Styling API
