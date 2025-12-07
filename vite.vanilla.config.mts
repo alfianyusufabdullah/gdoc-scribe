@@ -3,12 +3,6 @@ import { resolve } from 'path';
 import dts from 'vite-plugin-dts';
 
 export default defineConfig({
-    plugins: [
-        dts({
-            insertTypesEntry: true,
-            include: ['src/vanilla', 'src/core']
-        })
-    ],
     build: {
         emptyOutDir: false, // Don't delete dist from main build
         lib: {

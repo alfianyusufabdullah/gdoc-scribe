@@ -6,7 +6,11 @@ export default defineConfig({
     plugins: [
         dts({
             insertTypesEntry: true,
-            include: ['src']
+            include: ['src'],
+            rollupTypes: true,
+            compilerOptions: {
+                removeComments: true
+            }
         })
     ],
     build: {
