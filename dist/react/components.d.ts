@@ -1,6 +1,7 @@
 import { default as React } from 'react';
 import { GoogleDoc } from '../core/types';
-export interface GDocViewerProps {
+import { UseDocsOptions } from './useDocs';
+export interface GDocViewerProps extends UseDocsOptions {
     doc: GoogleDoc | null;
     className?: string;
 }
