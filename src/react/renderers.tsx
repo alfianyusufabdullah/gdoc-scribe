@@ -1,6 +1,6 @@
 import React from 'react';
 import { Paragraph, TextRun, StructuralElement, Table, ListItemNode, InlineObjects, Lists, ClassNames, ImageProps, CodeBlockProps, ParagraphProps, ListGroupProps, TableProps } from '../core/types';
-import { buildListTree, getParagraphText, slugify, parseInlineContent } from '../core/utils';
+import { buildListTree, slugify, parseInlineContent } from '../core/utils';
 import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
 
 export interface RendererRegistry {
