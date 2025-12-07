@@ -12,7 +12,7 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/index.ts'),
-            name: 'GDocScribe',
+            name: 'GDocScribeLib',
             fileName: (format) => `gdoc-scribe.${format}.js`,
             formats: ['es', 'umd']
         },
