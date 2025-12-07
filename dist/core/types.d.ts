@@ -152,6 +152,8 @@ export interface InlineObjectProperties {
                 unit?: string | null;
             };
         };
+        title?: string | null;
+        description?: string | null;
     };
 }
 export interface InlineObjects {
@@ -221,4 +223,47 @@ export interface ClassNames {
     table_row?: string;
     table_cell?: string;
     image?: string;
+}
+export interface ImageProps {
+    src: string;
+    alt: string;
+    title?: string;
+    className?: string;
+    original?: {
+        objectId: string | null | undefined;
+        inlineObjects?: InlineObjects | null;
+    };
+}
+export interface CodeBlockProps {
+    content: string;
+    language: string;
+    className?: string;
+    original?: {
+        block: CodeBlock;
+    };
+}
+export interface ParagraphProps<T = any> {
+    children: T;
+    style?: ParagraphStyle;
+    text: string;
+    className?: string;
+    original?: {
+        paragraph: Paragraph;
+    };
+}
+export interface ListGroupProps<T = any> {
+    children: T;
+    type: 'ordered' | 'unordered';
+    className?: string;
+    original?: {
+        items: StructuralElement[];
+        lists?: Lists | null;
+    };
+}
+export interface TableProps<T = any> {
+    children: T;
+    className?: string;
+    original?: {
+        table: Table;
+    };
 }
