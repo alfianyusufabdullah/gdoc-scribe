@@ -1,14 +1,14 @@
 import React from 'react';
-import { Paragraph, TextRun, StructuralElement, Table, ListItemNode, InlineObjects, Lists, CodeBlock, ClassNames } from '../core/types';
+import { Paragraph, TextRun, StructuralElement, Table, ListItemNode, InlineObjects, Lists, ClassNames, ImageProps, CodeBlockProps, ParagraphProps, ListGroupProps, TableProps } from '../core/types';
 import { buildListTree, getParagraphText, slugify, parseInlineContent } from '../core/utils';
 import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle } from '../core/parser';
 
 export interface RendererRegistry {
-    paragraph?: React.ComponentType<any>;
-    list_group?: React.ComponentType<any>;
-    code_block?: React.ComponentType<any>;
-    table?: React.ComponentType<any>;
-    image?: React.ComponentType<any>;
+    paragraph?: React.ComponentType<ParagraphProps<React.ReactNode>>;
+    list_group?: React.ComponentType<ListGroupProps<React.ReactNode>>;
+    code_block?: React.ComponentType<CodeBlockProps>;
+    table?: React.ComponentType<TableProps<React.ReactNode>>;
+    image?: React.ComponentType<ImageProps>;
 }
 
 export interface RendererProps {
@@ -18,23 +18,50 @@ export interface RendererProps {
 
 export type RenderContentFn = (content: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: Lists | null) => React.ReactNode;
 
-export function CodeBlockRenderer({ block, classNames }: { block: CodeBlock; classNames?: ClassNames }) {
+export function CodeBlockRenderer({ content, language, className }: CodeBlockProps) {
     return (
-        <pre className={classNames?.code_block}>
-            <code className={block.language ? `language-${block.language}` : undefined}>
-                {block.content}
+        <pre className={className}>
+            <code className={language ? `language - ${language} ` : undefined}>
+                {content}
             </code>
         </pre>
     );
 }
 
-export function ParagraphRenderer({ paragraph, inlineObjects, renderers, classNames }: { paragraph: Paragraph; inlineObjects?: InlineObjects | null; renderers?: RendererRegistry; classNames?: ClassNames }) {
-    const style = paragraph.paragraphStyle;
-    const Tag = getHeadingTag(style) as keyof React.JSX.IntrinsicElements;
+// --- Internal Helper Components for Default Rendering ---
 
-    const alignment = getAlignmentStyle(style?.alignment || undefined);
+export function ParagraphContent({ paragraph, inlineObjects, renderers, classNames }: { paragraph: Paragraph; inlineObjects?: InlineObjects | null; renderers?: RendererRegistry; classNames?: ClassNames }) {
+    const ImageComponent = renderers?.image || ImageRenderer;
+    return (
+        <>
+            {paragraph.elements?.map((el, idx) => (
+                <React.Fragment key={idx} >
+                    {el.textRun && <TextRunRenderer textRun={el.textRun} />}
+                    {el.inlineObjectElement && (() => {
+                        const objectId = el.inlineObjectElement.inlineObjectId;
+                        const imageData = getImageData(objectId, inlineObjects);
+                        if (!imageData) return null;
+                        return (
+                            <ImageComponent
+                                src={imageData.src}
+                                alt={imageData.alt}
+                                title={imageData.title}
+                                className={classNames?.image}
+                                original={{ objectId, inlineObjects }}
+                            />
+                        );
+                    })()}
+                </React.Fragment>
+            ))}
+        </>
+    );
+}
+
+export function ParagraphRenderer({ children, style, text, className }: ParagraphProps<React.ReactNode>) {
+    const Tag = getHeadingTag(style) as keyof React.JSX.IntrinsicElements;
     const cssStyle: React.CSSProperties = {};
 
+    const alignment = getAlignmentStyle(style?.alignment || undefined);
     if (alignment) cssStyle.textAlign = alignment as any;
 
     // Indentation
@@ -73,31 +100,12 @@ export function ParagraphRenderer({ paragraph, inlineObjects, renderers, classNa
 
     let id: string | undefined;
     if (Tag.startsWith('h')) {
-        const text = getParagraphText(paragraph.elements || []);
         if (text) id = slugify(text);
     }
 
-    const ImageComponent = renderers?.image || ImageRenderer;
-
-    // Determine className based on tag
-    let className = classNames?.paragraph;
-    if (Tag === 'h1') className = classNames?.h1 || className;
-    if (Tag === 'h2') className = classNames?.h2 || className;
-    if (Tag === 'h3') className = classNames?.h3 || className;
-    if (Tag === 'h4') className = classNames?.h4 || className;
-    if (Tag === 'h5') className = classNames?.h5 || className;
-    if (Tag === 'h6') className = classNames?.h6 || className;
-
     return (
         <Tag id={id} style={cssStyle} className={className}>
-            {
-                paragraph.elements?.map((el, idx) => (
-                    <React.Fragment key={idx} >
-                        {el.textRun && <TextRunRenderer textRun={el.textRun} />}
-                        {el.inlineObjectElement && <ImageComponent objectId={el.inlineObjectElement.inlineObjectId} inlineObjects={inlineObjects} classNames={classNames} />}
-                    </React.Fragment>
-                ))
-            }
+            {children}
         </Tag>
     );
 }
@@ -142,7 +150,17 @@ export function TextRunRenderer({ textRun }: { textRun: TextRun }) {
     );
 }
 
-export function ListGroup({ items, inlineObjects, lists, renderers, classNames }: { items: StructuralElement[]; inlineObjects?: InlineObjects | null; lists?: Lists | null; renderers?: RendererRegistry; classNames?: ClassNames }) {
+export function ListGroup({ children, type, className }: ListGroupProps<React.ReactNode>) {
+    const Tag = type === 'ordered' ? 'ol' : 'ul';
+    return (
+        <Tag className={className}>
+            {children}
+        </Tag>
+    );
+}
+
+// Helper to render list items recursively
+export function ListGroupContent({ items, inlineObjects, lists, renderers, classNames }: { items: StructuralElement[]; inlineObjects?: InlineObjects | null; lists?: Lists | null; renderers?: RendererRegistry; classNames?: ClassNames }) {
     const tree = buildListTree(items);
 
     const renderList = (nodes: ListItemNode[]) => {
@@ -152,33 +170,59 @@ export function ListGroup({ items, inlineObjects, lists, renderers, classNames }
         const listId = firstNode.item.paragraph?.bullet?.listId;
         const level = firstNode.level;
 
-        const { tag, styleType } = getListTagAndStyle(listId, level, lists);
-        const ListTag = tag as keyof JSX.IntrinsicElements;
+        const { styleType } = getListTagAndStyle(listId, level, lists);
 
         return (
-            <ListTag style={{ listStyleType: styleType }} className={classNames?.list_group}>
+            <>
                 {nodes.map((node, idx) => (
-                    <li key={idx} className={classNames?.list_item}>
+                    <li key={idx} className={classNames?.list_item} style={{ listStyleType: styleType }}>
                         {node.item.paragraph?.elements?.map((el, i) => {
                             const ImageComponent = renderers?.image || ImageRenderer;
                             return (
                                 <React.Fragment key={i}>
                                     {el.textRun && <TextRunRenderer textRun={el.textRun} />}
-                                    {el.inlineObjectElement && <ImageComponent objectId={el.inlineObjectElement.inlineObjectId} inlineObjects={inlineObjects} classNames={classNames} />}
+                                    {el.inlineObjectElement && (() => {
+                                        const objectId = el.inlineObjectElement.inlineObjectId;
+                                        const imageData = getImageData(objectId, inlineObjects);
+                                        if (!imageData) return null;
+                                        return (
+                                            <ImageComponent
+                                                src={imageData.src}
+                                                alt={imageData.alt}
+                                                title={imageData.title}
+                                                className={classNames?.image}
+                                                original={{ objectId, inlineObjects }}
+                                            />
+                                        );
+                                    })()}
                                 </React.Fragment>
                             );
                         })}
-                        {node.children.length > 0 && renderList(node.children)}
+                        {node.children.length > 0 && (
+                            <ul style={{ listStyleType: 'none', paddingLeft: '20px' }}>
+                                {renderList(node.children)}
+                            </ul>
+                        )}
                     </li>
                 ))}
-            </ListTag>
+            </>
         );
     };
 
     return renderList(tree);
 }
 
-export function TableRenderer({
+export function TableRenderer({ children, className }: TableProps<React.ReactNode>) {
+    return (
+        <table className={className}>
+            <tbody>
+                {children}
+            </tbody>
+        </table>
+    );
+}
+
+export function TableContent({
     table,
     inlineObjects,
     lists,
@@ -192,44 +236,33 @@ export function TableRenderer({
     classNames?: ClassNames;
 }) {
     return (
-        <table className={classNames?.table}>
-            <tbody>
-                {table.tableRows?.map((row, rIdx) => (
-                    <tr key={rIdx} className={classNames?.table_row}>
-                        {row.tableCells?.map((cell, cIdx) => {
-                            const style: React.CSSProperties = {};
-                            if (cell.tableCellStyle?.columnSpan) {
-                                // @ts-ignore
-                                style.colSpan = cell.tableCellStyle.columnSpan;
-                            }
-
-                            return (
-                                <td
-                                    key={cIdx}
-                                    colSpan={cell.tableCellStyle?.columnSpan || undefined}
-                                    rowSpan={cell.tableCellStyle?.rowSpan || undefined}
-                                    className={classNames?.table_cell}
-                                >
-                                    {cell.content && renderContent(cell.content, inlineObjects, lists)}
-                                </td>
-                            );
-                        })}
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+        <>
+            {table.tableRows?.map((row, rIdx) => (
+                <tr key={rIdx} className={classNames?.table_row}>
+                    {row.tableCells?.map((cell, cIdx) => {
+                        return (
+                            <td
+                                key={cIdx}
+                                colSpan={cell.tableCellStyle?.columnSpan || undefined}
+                                rowSpan={cell.tableCellStyle?.rowSpan || undefined}
+                                className={classNames?.table_cell}
+                            >
+                                {cell.content && renderContent(cell.content, inlineObjects, lists)}
+                            </td>
+                        );
+                    })}
+                </tr>
+            ))}
+        </>
     );
 }
 
-export function ImageRenderer({ objectId, inlineObjects, classNames }: { objectId: string | null | undefined; inlineObjects?: InlineObjects | null; classNames?: ClassNames }) {
-    const imageData = getImageData(objectId, inlineObjects);
-    if (!imageData) return null;
-
+export function ImageRenderer({ src, alt, className }: ImageProps) {
     return (
         <img
-            src={imageData.src}
-            alt={imageData.alt}
-            className={classNames?.image}
+            src={src}
+            alt={alt}
+            className={className}
             style={{
                 maxWidth: '100%',
                 height: 'auto',
