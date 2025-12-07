@@ -14,6 +14,7 @@ export declare const getAlignmentStyle: (alignment: string | undefined) => strin
 export declare const getImageData: (objectId: string | null | undefined, inlineObjects: InlineObjects | null | undefined) => {
     src: string;
     alt: string;
+    title?: string;
 } | null;
 export declare const getDimensionStyle: (dimension: Dimension | undefined | null) => string | null;
 export declare const getColorStyle: (color: Color | undefined | null) => string | null;
