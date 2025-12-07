@@ -857,6 +857,32 @@ window.mockDoc = {
                     "elements": [
                         {
                             "textRun": {
+                                "content": "Sensitive Data Example\n",
+                                "textStyle": { "fontSize": { "magnitude": 18, "unit": "PT" }, "bold": true }
+                            }
+                        }
+                    ],
+                    "paragraphStyle": { "namedStyleType": "HEADING_1", "direction": "LEFT_TO_RIGHT" }
+                }
+            },
+            {
+                "paragraph": {
+                    "elements": [
+                        {
+                            "textRun": {
+                                "content": "This section contains CONFIDENTIAL information that should be redacted when the transformer is enabled.\n",
+                                "textStyle": {}
+                            }
+                        }
+                    ],
+                    "paragraphStyle": { "namedStyleType": "NORMAL_TEXT", "direction": "LEFT_TO_RIGHT" }
+                }
+            },
+            {
+                "paragraph": {
+                    "elements": [
+                        {
+                            "textRun": {
                                 "content": "License\n",
                                 "textStyle": { "fontSize": { "magnitude": 18, "unit": "PT" }, "bold": true }
                             }
