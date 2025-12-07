@@ -218,23 +218,83 @@ const scribe = new GDocScribe(docData, {
 scribe.render(document.getElementById('app'));
 ```
 
-#### 3. Custom Renderers
+#### Custom Renderers (Plugin System)
 
-Override render functions to return custom DOM elements.
+You can override the default rendering for specific elements. This is useful for using your own components (e.g., `Next.js Image`, `SyntaxHighlighter`, or custom UI components).
+
+**Supported Renderers:**
+- `paragraph`: Wrapper for text blocks (headings, p).
+- `list_group`: Wrapper for lists (ul, ol).
+- `code_block`: Code blocks.
+- `table`: Tables.
+- `image`: Images.
+
+#### React Example
+
+```tsx
+import { useDocs } from 'gdoc-scribe';
+import Image from 'next/image';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+
+const MyDoc = ({ doc }) => {
+  const { html } = useDocs(doc, {
+    renderers: {
+      // Simplified Image API: directly get src, alt, title
+      image: ({ src, alt, title, className }) => (
+        <Image 
+          src={src} 
+          alt={alt} 
+          title={title}
+          width={500} 
+          height={300} 
+          className={className} 
+        />
+      ),
+      // Simplified Code Block API: directly get content and language
+      code_block: ({ content, language, className }) => (
+        <div className={className}>
+          <SyntaxHighlighter language={language}>
+            {content}
+          </SyntaxHighlighter>
+        </div>
+      ),
+      // Simplified Paragraph API: get pre-rendered children
+      paragraph: ({ children, style, text, className }) => {
+        // Example: Wrap all headings in a special div
+        if (style?.namedStyleType?.startsWith('HEADING')) {
+           return <div className="heading-wrapper">{children}</div>;
+        }
+        return <p className={className}>{children}</p>;
+      }
+    }
+  });
+
+  return <div className="prose">{html}</div>;
+};
+```
+
+#### Vanilla JS Example
 
 ```javascript
-const scribe = new GDocScribe(docData, {
-    renderers: {
-        // Custom Image Renderer
-        image: (objectId, inlineObjects) => {
-            const imgData = inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject?.imageProperties;
-            const img = document.createElement('img');
-            img.src = imgData.contentUri;
-            img.className = 'custom-image-class';
-            img.onclick = () => alert('Image clicked!');
-            return img;
-        }
+const scribe = new GDocScribe(doc, {
+  renderers: {
+    // Return an HTMLElement
+    image: ({ src, alt, title, className }) => {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = alt;
+      img.className = className;
+      img.loading = 'lazy'; // Add lazy loading
+      return img;
+    },
+    // children is a DocumentFragment containing the rendered content
+    paragraph: ({ children, style, className }) => {
+       const p = document.createElement('p');
+       p.className = className;
+       p.appendChild(children);
+       return p;
     }
+  }
 });
 ```
 

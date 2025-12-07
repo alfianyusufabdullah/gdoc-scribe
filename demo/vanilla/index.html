@@ -540,31 +540,6 @@
             }
         });
 
-        // Custom Renderer: Code Block with Copy Button
-        const renderCustomCodeBlock = (block) => {
-            const container = document.createElement('div');
-            container.className = 'relative group';
-
-            const button = document.createElement('button');
-            button.className = 'absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity';
-            button.textContent = 'Copy';
-            button.onclick = () => {
-                navigator.clipboard.writeText(block.content);
-                button.textContent = 'Copied!';
-                setTimeout(() => button.textContent = 'Copy', 2000);
-            };
-
-            const pre = document.createElement('pre');
-            const code = document.createElement('code');
-            code.className = `language-${block.language}`;
-            code.textContent = block.content;
-
-            pre.appendChild(code);
-            container.appendChild(button);
-            container.appendChild(pre);
-
-            return container;
-        };
 
         // Transformer: Redact "CONFIDENTIAL"
         const sensitiveDataTransformer = (blocks) => {
@@ -595,11 +570,41 @@
                 };
 
                 if (customRenderersCheckbox.checked) {
-                    options.renderers.code_block = renderCustomCodeBlock;
-                }
+                    options.renderers = {
+                        code_block: ({ content, language, className }) => {
+                            const container = document.createElement('div');
+                            container.className = 'relative group';
 
-                if (transformersCheckbox.checked) {
-                    options.transformers.push(sensitiveDataTransformer);
+                            const button = document.createElement('button');
+                            button.className = 'absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity';
+                            button.textContent = 'Copy';
+                            button.onclick = () => {
+                                navigator.clipboard.writeText(content);
+                                button.textContent = 'Copied!';
+                                setTimeout(() => button.textContent = 'Copy', 2000);
+                            };
+
+                            const pre = document.createElement('pre');
+                            const code = document.createElement('code');
+                            if (language) code.className = `language-${language}`;
+                            code.textContent = content;
+
+                            pre.appendChild(code);
+                            container.appendChild(button);
+                            container.appendChild(pre);
+
+                            return container;
+                        },
+                        image: ({ src, alt, title, className }) => {
+                            const img = document.createElement('img');
+                            img.src = src;
+                            img.alt = alt;
+                            if (title) img.title = title;
+                            img.className = className || '';
+                            img.style.border = '2px solid red'; // Visual indicator of custom renderer
+                            return img;
+                        }
+                    };
                 }
 
                 // Render content
