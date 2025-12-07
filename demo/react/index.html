@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GDoc-Scribe Studio</title>
     <!-- React Dependencies -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script src="../../dist/gdoc-scribe.umd.js"></script>
@@ -355,8 +355,49 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
         const { useDocs } = window.GDocScribe;
+
+        // Custom Renderer: Code Block with Copy Button
+        const CustomCodeBlock = ({ block }) => {
+            const [copied, setCopied] = useState(false);
+
+            const handleCopy = () => {
+                navigator.clipboard.writeText(block.content);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+
+            return (
+                <div className="relative group">
+                    <button
+                        onClick={handleCopy}
+                        className="absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                    <pre><code className={`language-${block.language}`}>{block.content}</code></pre>
+                </div>
+            );
+        };
+
+        // Transformer: Redact "CONFIDENTIAL"
+        const sensitiveDataTransformer = (blocks) => {
+            const redactText = (text) => text.replace(/CONFIDENTIAL/g, '████████████');
+
+            return blocks.map(block => {
+                if (block.paragraph) {
+                    const newElements = block.paragraph.elements.map(el => {
+                        if (el.textRun) {
+                            return { ...el, textRun: { ...el.textRun, content: redactText(el.textRun.content) } };
+                        }
+                        return el;
+                    });
+                    return { ...block, paragraph: { ...block.paragraph, elements: newElements } };
+                }
+                return block;
+            });
+        };
 
         // Toast Component
         const Toast = ({ message, type, show, onClose }) => {
@@ -386,9 +427,19 @@
             const [docData, setDocData] = useState(window.mockDoc);
             const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
             const [wordCount, setWordCount] = useState(0);
+
+            // Feature Toggles
+            const [enableCustomRenderers, setEnableCustomRenderers] = useState(false);
+            const [enableTransformers, setEnableTransformers] = useState(false);
+
             const scrollContainerRef = useRef(null);
 
-            const { html, toc } = useDocs(docData);
+            const options = useMemo(() => ({
+                renderers: enableCustomRenderers ? { code_block: CustomCodeBlock } : {},
+                transformers: enableTransformers ? [sensitiveDataTransformer] : []
+            }), [enableCustomRenderers, enableTransformers]);
+
+            const { html, toc } = useDocs(docData, options);
 
             useEffect(() => {
                 // Syntax highlighting
@@ -443,6 +494,32 @@
                                 </button>
                             </div>
                         </div>
+
+                        {/* Feature Toggles */}
+                        <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Custom Features</h3>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={enableCustomRenderers}
+                                        onChange={e => setEnableCustomRenderers(e.target.checked)}
+                                        className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    Enable Custom Renderers (Copy Button)
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={enableTransformers}
+                                        onChange={e => setEnableTransformers(e.target.checked)}
+                                        className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-offset-slate-900"
+                                    />
+                                    Enable Sensitive Data Filter
+                                </label>
+                            </div>
+                        </div>
+
                         <div className="editor-content">
                             <textarea
                                 value={jsonInput}

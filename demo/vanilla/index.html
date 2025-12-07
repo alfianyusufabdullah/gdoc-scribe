@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GDoc-Scribe Studio</title>
-    <script src="../../dist/gdoc-scribe.umd.js"></script>
+    <script src="../../dist/gdoc-scribe.vanilla.umd.js"></script>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -350,7 +350,8 @@
         <!-- Editor Pane -->
         <div class="editor-pane">
             <div class="editor-header">
-                <div class="brand">GDoc<span>Scribe</span></div>
+                <div class="brand">GDoc<span>Scribe</span> <span
+                        style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5rem">(Vanilla)</span></div>
                 <div class="editor-actions">
                     <button id="renderBtn" class="btn btn-primary">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,6 +365,48 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Toolbar -->
+            <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex flex-col gap-4">
+                <!-- File Operations -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">File Operations</h3>
+                    <div class="flex gap-2">
+                        <label class="btn bg-slate-700 hover:bg-slate-600 text-white text-xs cursor-pointer">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                            Upload JSON
+                            <input type="file" id="fileInput" accept=".json" class="hidden">
+                        </label>
+                        <select id="sampleSelect"
+                            class="bg-slate-800 text-white text-xs border border-slate-600 rounded px-2 py-1 outline-none focus:border-blue-500">
+                            <option value="readme">Sample: README</option>
+                            <option value="empty">Sample: Empty</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Feature Toggles -->
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Custom Features</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none group">
+                            <input type="checkbox" id="customRenderers"
+                                class="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-offset-slate-900 focus:ring-blue-500">
+                            <span class="group-hover:text-white transition-colors">Enable Custom Renderers (Copy
+                                Button)</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none group">
+                            <input type="checkbox" id="transformers"
+                                class="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-offset-slate-900 focus:ring-blue-500">
+                            <span class="group-hover:text-white transition-colors">Enable Sensitive Data Filter</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <div class="editor-content">
                 <textarea id="jsonInput" spellcheck="false" class="text-white p-4"
                     placeholder="// Paste your Google Doc JSON here..."></textarea>
@@ -428,6 +471,11 @@
         const toast = document.getElementById('toast');
         const toastMsg = document.getElementById('toastMsg');
         const wordCount = document.getElementById('wordCount');
+        const customRenderersCheckbox = document.getElementById('customRenderers');
+        const transformersCheckbox = document.getElementById('transformers');
+
+        const fileInput = document.getElementById('fileInput');
+        const sampleSelect = document.getElementById('sampleSelect');
 
         // Show Toast Function
         function showToast(message, type = 'success') {
@@ -455,16 +503,115 @@
 
         // Use mockDoc from external file (window.mockDoc)
         const mockDoc = window.mockDoc;
+        const emptyDoc = { title: "Empty Document", body: { content: [] } };
 
         // Set default value
         jsonInput.value = JSON.stringify(mockDoc, null, 2);
+
+        // File Upload Handler
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const json = JSON.parse(event.target.result);
+                    jsonInput.value = JSON.stringify(json, null, 2);
+                    renderDoc(json);
+                    showToast(`Loaded ${file.name}`, 'success');
+                    sampleSelect.value = ''; // Reset select
+                } catch (err) {
+                    showToast('Invalid JSON file', 'error');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Sample Selector Handler
+        sampleSelect.addEventListener('change', (e) => {
+            const value = e.target.value;
+            if (value === 'readme') {
+                jsonInput.value = JSON.stringify(mockDoc, null, 2);
+                renderDoc(mockDoc);
+            } else if (value === 'empty') {
+                jsonInput.value = JSON.stringify(emptyDoc, null, 2);
+                renderDoc(emptyDoc);
+            }
+        });
+
+        // Custom Renderer: Code Block with Copy Button
+        const renderCustomCodeBlock = (block) => {
+            const container = document.createElement('div');
+            container.className = 'relative group';
+
+            const button = document.createElement('button');
+            button.className = 'absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity';
+            button.textContent = 'Copy';
+            button.onclick = () => {
+                navigator.clipboard.writeText(block.content);
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = 'Copy', 2000);
+            };
+
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            code.className = `language-${block.language}`;
+            code.textContent = block.content;
+
+            pre.appendChild(code);
+            container.appendChild(button);
+            container.appendChild(pre);
+
+            return container;
+        };
+
+        // Transformer: Redact "CONFIDENTIAL"
+        const sensitiveDataTransformer = (blocks) => {
+            const redactText = (text) => text.replace(/CONFIDENTIAL/g, '████████████');
+
+            return blocks.map(block => {
+                if (block.paragraph) {
+                    const newElements = block.paragraph.elements.map(el => {
+                        if (el.textRun) {
+                            return { ...el, textRun: { ...el.textRun, content: redactText(el.textRun.content) } };
+                        }
+                        return el;
+                    });
+                    return { ...block, paragraph: { ...block.paragraph, elements: newElements } };
+                }
+                return block;
+            });
+        };
 
         function renderDoc(docData) {
             app.innerHTML = ''; // Clear previous render
             try {
                 console.log('Initializing GDocScribe...');
+
+                const options = {
+                    renderers: {},
+                    transformers: []
+                };
+
+                if (customRenderersCheckbox.checked) {
+                    options.renderers.code_block = renderCustomCodeBlock;
+                }
+
+                if (transformersCheckbox.checked) {
+                    options.transformers.push(sensitiveDataTransformer);
+                }
+
                 // Render content
-                const scribe = new GDocScribe.GDocScribe(docData);
+                // Handle potential UMD namespace issues
+                console.log('GDocScribeLib Global:', window.GDocScribeLib);
+
+                const GDocScribeClass = window.GDocScribeLib?.GDocScribe;
+                if (typeof GDocScribeClass !== 'function') {
+                    throw new Error('GDocScribe class not found in GDocScribeLib. Please check the build.');
+                }
+
+                const scribe = new GDocScribeClass(docData, options);
                 scribe.render(app);
 
                 // Render TOC
@@ -532,6 +679,21 @@
             } catch (e) {
                 showToast('Invalid JSON format', 'error');
             }
+        });
+
+        // Re-render when toggles change
+        customRenderersCheckbox.addEventListener('change', () => {
+            try {
+                const json = JSON.parse(jsonInput.value);
+                renderDoc(json);
+            } catch (e) { }
+        });
+
+        transformersCheckbox.addEventListener('change', () => {
+            try {
+                const json = JSON.parse(jsonInput.value);
+                renderDoc(json);
+            } catch (e) { }
         });
 
         // Initial render
