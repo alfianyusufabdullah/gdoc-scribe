@@ -19,11 +19,26 @@ A lightweight, flexible library for parsing and rendering Google Docs JSON conte
 
 ## Installation
 
+### NPM
 ```bash
 npm install gdoc-scribe
+```
+
+### CDN (Vanilla JS)
+For usage without a bundler (e.g., plain HTML/JS), use the standalone Vanilla bundle via jsDelivr:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/gdoc-scribe@latest/dist/gdoc-scribe.vanilla.umd.js"></script>
+<script>
+  const { GDocScribe } = window.GDocScribeLib;
+  // ... usage
+</script>
+```
+
+See [PUBLISHING.md](./PUBLISHING.md) for a complete guide on publishing and CDN usage.
 # or
 yarn add gdoc-scribe
-```
+
 
 ## Usage
 
