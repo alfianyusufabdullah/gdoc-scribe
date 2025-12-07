@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GDocScribe } from '../src/vanilla/scribe';
 import { GoogleDoc } from '../src/core/types';
