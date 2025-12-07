@@ -14,11 +14,13 @@
   "scripts": {
     "test": "vitest",
     "build": "vite build && vite build -c vite.vanilla.config.mts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && mv README.md README.bak.md && cp NPM_README.md README.md",
+    "postpublish": "mv README.bak.md README.md"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "sideEffects": false,
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
@@ -26,6 +28,7 @@
     "jsdom": "^27.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "terser": "^5.44.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vite-plugin-dts": "^4.5.4",
