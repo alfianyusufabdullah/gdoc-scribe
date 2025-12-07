@@ -110,14 +110,15 @@ export const getAlignmentStyle = (alignment: string | undefined): string | undef
     }
 };
 
-export const getImageData = (objectId: string | null | undefined, inlineObjects: InlineObjects | null | undefined): { src: string; alt: string } | null => {
+export const getImageData = (objectId: string | null | undefined, inlineObjects: InlineObjects | null | undefined): { src: string; alt: string; title?: string } | null => {
     if (!objectId || !inlineObjects) return null;
     const embeddedObject = inlineObjects[objectId]?.inlineObjectProperties?.embeddedObject;
     if (!embeddedObject?.imageProperties?.contentUri) return null;
 
     return {
         src: embeddedObject.imageProperties.contentUri,
-        alt: "Embedded Image" // Google Docs API doesn't always provide alt text easily in this structure, defaulting for now
+        alt: embeddedObject.title || "Embedded Image",
+        title: embeddedObject.description || undefined
     };
 };
 
