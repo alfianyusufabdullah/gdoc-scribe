@@ -1,14 +1,28 @@
 import React, { useMemo } from 'react';
-import { GoogleDoc, StructuralElement, Paragraph, Table, ListItemNode, TocItem, InlineObjects, Lists, TextRun, CodeBlock } from '../core/types';
-import { processContent, buildListTree, extractHeadings, getParagraphText, slugify, parseInlineContent } from '../core/utils';
-import { getTextTags, getHeadingTag, getListTagAndStyle, getAlignmentStyle, getImageData, getDimensionStyle, getColorStyle, SemanticTag } from '../core/parser';
+import { GoogleDoc, StructuralElement, InlineObjects, Lists, ProcessedBlock, ClassNames, Transformer } from '../core/types';
+import { processContent, extractHeadings } from '../core/utils';
+import { BlockErrorBoundary } from './ErrorBoundary';
+import {
+    ParagraphRenderer,
+    CodeBlockRenderer,
+    ListGroup,
+    TableRenderer,
+    RenderContentFn,
+    RendererRegistry
+} from './renderers';
 
-interface UseDocsResult {
-    html: React.ReactNode;
-    toc: TocItem[];
+export interface UseDocsOptions {
+    renderers?: RendererRegistry;
+    transformers?: Transformer[];
+    classNames?: ClassNames;
 }
 
-export const useDocs = (doc: GoogleDoc | null | undefined): UseDocsResult => {
+export interface UseDocsResult {
+    html: React.ReactNode;
+    toc: { id: string; text: string; level: number }[];
+}
+
+export const useDocs = (doc: GoogleDoc | null | undefined, options: UseDocsOptions = {}): UseDocsResult => {
     const toc = useMemo(() => {
         if (!doc?.body?.content) return [];
         return extractHeadings(doc.body.content);
@@ -16,232 +30,56 @@ export const useDocs = (doc: GoogleDoc | null | undefined): UseDocsResult => {
 
     const html = useMemo(() => {
         if (!doc?.body?.content) return null;
-        return renderContentBlocks(doc.body.content, doc.inlineObjects, doc.lists);
-    }, [doc]);
+        return renderContentBlocks(doc.body.content, doc.inlineObjects, doc.lists, options);
+    }, [doc, options]);
 
     return { html, toc };
 };
 
 // --- Internal Rendering Logic ---
 
-function renderContentBlocks(content: StructuralElement[], inlineObjects?: InlineObjects | null, lists?: Lists | null): React.ReactNode[] {
-    const blocks = processContent(content);
-    return blocks.map((block, index) => {
-        if ('type' in block && block.type === 'list_group') {
-            return <ListGroup key={index} items={block.items} inlineObjects={inlineObjects} lists={lists} />;
+function renderContentBlocks(
+    content: StructuralElement[],
+    inlineObjects?: InlineObjects | null,
+    lists?: Lists | null,
+    options: UseDocsOptions = {}
+): React.ReactNode[] {
+    const { renderers = {}, transformers = [], classNames = {} } = options;
+    const blocks = processContent(content, transformers);
+
+    // Helper for recursion that preserves options
+    const recursiveRender: RenderContentFn = (c, i, l) => renderContentBlocks(c, i, l, options);
+
+    return blocks.map((block: ProcessedBlock, index) => {
+        let Component: React.ComponentType<any> | null = null;
+        let props: any = {};
+
+        if ('type' in block) {
+            if (block.type === 'list_group') {
+                Component = renderers.list_group || ListGroup;
+                props = { items: block.items, inlineObjects, lists, renderers, classNames };
+            } else if (block.type === 'code_block') {
+                Component = renderers.code_block || CodeBlockRenderer;
+                props = { block: block, classNames };
+            }
+        } else {
+            // It's a StructuralElement
+            if (block.paragraph) {
+                Component = renderers.paragraph || ParagraphRenderer;
+                props = { paragraph: block.paragraph, inlineObjects, renderers, classNames };
+            } else if (block.table) {
+                Component = renderers.table || TableRenderer;
+                props = { table: block.table, inlineObjects, lists, renderContent: recursiveRender, classNames };
+            }
         }
-        if ('type' in block && block.type === 'code_block') {
-            return <CodeBlockRenderer key={index} block={block} />;
+
+        if (Component) {
+            return (
+                <BlockErrorBoundary key={index}>
+                    <Component {...props} />
+                </BlockErrorBoundary>
+            );
         }
-        const element = block as StructuralElement;
-        if (element.paragraph) return <ParagraphRenderer key={index} paragraph={element.paragraph} inlineObjects={inlineObjects} />;
-        if (element.table) return <TableRenderer key={index} table={element.table} inlineObjects={inlineObjects} lists={lists} />;
         return null;
     });
-}
-
-function CodeBlockRenderer({ block }: { block: CodeBlock }) {
-    return (
-        <pre>
-            <code className={block.language ? `language-${block.language}` : undefined}>
-                {block.content}
-            </code>
-        </pre>
-    );
-}
-
-function ParagraphRenderer({ paragraph, inlineObjects }: { paragraph: Paragraph; inlineObjects?: InlineObjects | null }) {
-    const style = paragraph.paragraphStyle;
-    const tagName = getHeadingTag(style);
-    const Tag = tagName as keyof React.JSX.IntrinsicElements;
-
-    const alignment = getAlignmentStyle(style?.alignment || undefined);
-    const cssStyle: React.CSSProperties = {};
-
-    if (alignment) cssStyle.textAlign = alignment as any;
-
-    // Indentation
-    if (style?.indentStart) {
-        const val = getDimensionStyle(style.indentStart);
-        if (val) cssStyle.paddingLeft = val;
-    }
-    if (style?.indentEnd) {
-        const val = getDimensionStyle(style.indentEnd);
-        if (val) cssStyle.paddingRight = val;
-    }
-    if (style?.indentFirstLine) {
-        const val = getDimensionStyle(style.indentFirstLine);
-        if (val) cssStyle.textIndent = val;
-    }
-
-    // Spacing
-    if (style?.spaceAbove) {
-        const val = getDimensionStyle(style.spaceAbove);
-        if (val) cssStyle.marginTop = val;
-    }
-    if (style?.spaceBelow) {
-        const val = getDimensionStyle(style.spaceBelow);
-        if (val) cssStyle.marginBottom = val;
-    }
-
-    // Shading
-    if (style?.shading?.backgroundColor?.color) {
-        const bgColor = getColorStyle(style.shading.backgroundColor.color);
-        if (bgColor) {
-            cssStyle.backgroundColor = bgColor;
-            cssStyle.padding = '10px';
-            cssStyle.borderRadius = '4px';
-        }
-    }
-
-    let id: string | undefined;
-    if (tagName.startsWith('h')) {
-        const text = getParagraphText(paragraph.elements || []);
-        if (text) id = slugify(text);
-    }
-
-    return (
-        <Tag id={id} style={cssStyle}>
-            {
-                paragraph.elements?.map((el, idx) => (
-                    <React.Fragment key={idx} >
-                        {el.textRun && <TextRunRenderer textRun={el.textRun} />}
-                        {el.inlineObjectElement && <ImageRenderer objectId={el.inlineObjectElement.inlineObjectId} inlineObjects={inlineObjects} />}
-                    </React.Fragment>
-                ))
-            }
-        </Tag>
-    );
-}
-
-function TextRunRenderer({ textRun }: { textRun: TextRun }) {
-    let content = textRun.content || '';
-    if (!content) return null;
-    content = content.replace(/\u000b/g, '');
-
-    const tags = getTextTags(textRun.textStyle);
-
-    // Recursive wrapping
-    const wrapWithTags = (text: string, tagDefs: SemanticTag[]): React.ReactNode => {
-        if (tagDefs.length === 0) return text;
-        const [currentTag, ...rest] = tagDefs;
-        const Tag = currentTag.tag as keyof React.JSX.IntrinsicElements;
-        return <Tag {...(currentTag.attrs || {})}>{wrapWithTags(text, rest)}</Tag>;
-    };
-
-    const parts = parseInlineContent(content);
-
-    return (
-        <>
-            {parts.map((part, index) => {
-                if (part.type === 'code') {
-                    // Wrap code with other tags if present
-                    return (
-                        <React.Fragment key={index}>
-                            {wrapWithTags(part.content, [{ tag: 'code' }, ...tags])}
-                        </React.Fragment>
-                    );
-                } else {
-                    return (
-                        <React.Fragment key={index}>
-                            {wrapWithTags(part.content, tags)}
-                        </React.Fragment>
-                    );
-                }
-            })}
-        </>
-    );
-}
-
-function ListGroup({ items, inlineObjects, lists }: { items: StructuralElement[]; inlineObjects?: InlineObjects | null; lists?: Lists | null }) {
-    const tree = buildListTree(items);
-    return <ListTree nodes={tree} inlineObjects={inlineObjects} lists={lists} />;
-}
-
-function ListTree({ nodes, inlineObjects, lists }: { nodes: ListItemNode[]; inlineObjects?: InlineObjects | null; lists?: Lists | null }) {
-    if (nodes.length === 0) return null;
-
-    const firstNode = nodes[0];
-    const listId = firstNode.item.paragraph?.bullet?.listId;
-    const level = firstNode.level;
-
-    const { tag, styleType } = getListTagAndStyle(listId, level, lists);
-    const Tag = tag as keyof React.JSX.IntrinsicElements;
-    const style = { listStyleType: styleType };
-
-    return (
-        <Tag style={style}>
-            {
-                nodes.map((node, idx) => (
-                    <li key={idx} >
-                        {
-                            node.item.paragraph?.elements?.map((el, elIdx) => (
-                                <React.Fragment key={elIdx} >
-                                    {el.textRun && <TextRunRenderer textRun={el.textRun} />}
-                                </React.Fragment>
-                            ))
-                        }
-                        {node.children.length > 0 && <ListTree nodes={node.children} inlineObjects={inlineObjects} lists={lists} />}
-                    </li>
-                ))
-            }
-        </Tag>
-    );
-}
-
-function TableRenderer({ table, inlineObjects, lists }: { table: Table; inlineObjects?: InlineObjects | null; lists?: Lists | null }) {
-    return (
-        <table>
-            <tbody>
-                {
-                    table.tableRows?.map((row, rIdx) => (
-                        <tr key={rIdx} >
-                            {
-                                row.tableCells?.map((cell, cIdx) => (
-                                    <td key={cIdx} colSpan={cell.tableCellStyle?.columnSpan || 1} rowSpan={cell.tableCellStyle?.rowSpan || 1} >
-                                        {cell.content && renderContentBlocks(cell.content, inlineObjects, lists)}
-                                    </td>
-                                ))
-                            }
-                        </tr>
-                    ))
-                }
-            </tbody>
-        </table>
-    );
-}
-
-function ImageRenderer({ objectId, inlineObjects }: { objectId: string | null | undefined; inlineObjects?: InlineObjects | null }) {
-    const [isOpen, setIsOpen] = React.useState(false);
-
-    const imageData = getImageData(objectId, inlineObjects);
-    if (!imageData) return null;
-
-    return (
-        <>
-            <img
-                src={imageData.src}
-                alt={imageData.alt}
-                onClick={() => setIsOpen(true)
-                }
-                style={{ cursor: 'pointer' }}
-            />
-            {
-                isOpen && (
-                    <div
-                        style={
-                            {
-                                position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                                backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                zIndex: 9999, cursor: 'pointer'
-                            }
-                        }
-                        onClick={() => setIsOpen(false)
-                        }
-                    >
-                        <img src={imageData.src} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} />
-                    </div>
-                )}
-        </>
-    );
 }
