@@ -572,28 +572,45 @@
                 if (customRenderersCheckbox.checked) {
                     options.renderers = {
                         code_block: ({ content, language, className }) => {
-                            const container = document.createElement('div');
-                            container.className = 'relative group';
+                            try {
+                                const container = document.createElement('div');
+                                container.className = 'relative group';
 
-                            const button = document.createElement('button');
-                            button.className = 'absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity';
-                            button.textContent = 'Copy';
-                            button.onclick = () => {
-                                navigator.clipboard.writeText(content);
-                                button.textContent = 'Copied!';
-                                setTimeout(() => button.textContent = 'Copy', 2000);
-                            };
+                                const button = document.createElement('button');
+                                button.className = 'absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity';
+                                button.textContent = 'Copy';
+                                button.onclick = async () => {
+                                    try {
+                                        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                                            await navigator.clipboard.writeText(content);
+                                            button.textContent = 'Copied!';
+                                            setTimeout(() => button.textContent = 'Copy', 2000);
+                                        } else {
+                                            console.warn('Clipboard API not available');
+                                            button.textContent = 'Error';
+                                        }
+                                    } catch (err) {
+                                        console.error('Failed to copy code:', err);
+                                        button.textContent = 'Failed';
+                                    }
+                                };
 
-                            const pre = document.createElement('pre');
-                            const code = document.createElement('code');
-                            if (language) code.className = `language-${language}`;
-                            code.textContent = content;
+                                const pre = document.createElement('pre');
+                                const code = document.createElement('code');
+                                if (language) code.className = `language-${language}`;
+                                code.textContent = content || '';
 
-                            pre.appendChild(code);
-                            container.appendChild(button);
-                            container.appendChild(pre);
+                                pre.appendChild(code);
+                                container.appendChild(button);
+                                container.appendChild(pre);
 
-                            return container;
+                                return container;
+                            } catch (e) {
+                                console.error('Error in custom code_block renderer:', e);
+                                const pre = document.createElement('pre');
+                                pre.textContent = content || 'Error rendering code block';
+                                return pre;
+                            }
                         },
                         image: ({ src, alt, title, className }) => {
                             const img = document.createElement('img');
