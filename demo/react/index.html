@@ -361,20 +361,34 @@
         // Custom Renderer: Code Block with Copy Button
         const CustomCodeBlock = ({ block }) => {
             const [copied, setCopied] = useState(false);
+            const [error, setError] = useState(false);
 
-            const handleCopy = () => {
-                navigator.clipboard.writeText(block.content);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
+            const handleCopy = async () => {
+                try {
+                    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(block.content);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                        setError(false);
+                    } else {
+                        console.warn('Clipboard API not available');
+                        setError(true);
+                        setTimeout(() => setError(false), 2000);
+                    }
+                } catch (err) {
+                    console.error('Failed to copy code:', err);
+                    setError(true);
+                    setTimeout(() => setError(false), 2000);
+                }
             };
 
             return (
                 <div className="relative group">
                     <button
                         onClick={handleCopy}
-                        className="absolute right-2 top-2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`absolute right-2 top-2 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${error ? 'bg-red-600' : 'bg-gray-700'}`}
                     >
-                        {copied ? 'Copied!' : 'Copy'}
+                        {copied ? 'Copied!' : error ? 'Failed' : 'Copy'}
                     </button>
                     <pre><code className={`language-${block.language}`}>{block.content}</code></pre>
                 </div>
